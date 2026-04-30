@@ -32,7 +32,14 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
     >
-      <body className="min-h-full flex flex-col">
+      <body
+        className={cn(
+          "flex flex-col min-h-screen",
+          "bg-[linear-gradient(to_bottom,#ffffff_0%,#ffffff_40%,#ffd6d6_100%)]",
+          "dark:bg-[linear-gradient(to_bottom,#0f0f0f_0%,#0f0f0f_60%,#4a0000_100%)]",
+          "bg-fixed bg-no-repeat",
+        )}
+      >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
         </ThemeProvider>
