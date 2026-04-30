@@ -4,14 +4,14 @@ import React from "react";
 
 export default function ResetPassword() {
   return (
-    <div className="flex h-screen p-10 justify-center">
-      <div className="w-full flex gap-20">
+    <div className="flex h-screen p-8 md:p-10 justify-center items-start lg:items-stretch">
+      <div className="w-full flex justify-center lg:justify-start lg:gap-20">
         {/* Input */}
-        <div className="flex-3">
+        <div className="w-full lg:flex-3">
           <ResetField />
         </div>
         {/* CIMB Image */}
-        <div className="flex-4 h-full">
+        <div className="hidden lg:block lg:flex-4 h-full">
           <LandingImage />
         </div>
       </div>
