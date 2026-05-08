@@ -1,31 +1,20 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { FileSearch, Clock, ChevronRight } from "lucide-react";
+import { FileSearch, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FaWhatsapp } from "react-icons/fa";
+import { FaWhatsapp, FaSms } from "react-icons/fa";
 import { CiGlobe } from "react-icons/ci";
 import { MdOutlineEmail } from "react-icons/md";
-import { FaSms } from "react-icons/fa";
 import { GrLinkNext } from "react-icons/gr";
+import { ReportListItem } from "@/lib/types/report";
 
 // ─────────────────────────────────────────────
 // Type Definitions
 // ─────────────────────────────────────────────
 export type RiskLevel = "Low Risk" | "Medium Risk" | "High Risk";
-export type RiskLevelKey = "Low Risk" | "Medium Risk" | "High Risk";
 export type ReportHandlingStatus = "Submitted" | "In Review" | "Confirmed" | "Closed";
-
-export interface ReportItem {
-  id: string;
-  ticketId: string;
-  submittedAt: string;
-  channel: string;
-  riskScore: number;
-  riskLevel: RiskLevel;
-  status: ReportHandlingStatus;
-}
 
 // ─────────────────────────────────────────────
 // Configuration Helpers
@@ -37,7 +26,7 @@ const riskConfig: Record<RiskLevel, { bg: string; text: string; border: string; 
     border: "border-green-300",
     dateBg: "bg-green-400",
     dateText: "text-white",
-    icon: "/icon/warning_green_light.svg",
+    icon: "/icon/warning_green.svg",
     shadow: "shadow-[inset_0_3px_10px_rgba(34,197,94,0.25)]",
   },
   "Medium Risk": {
@@ -46,7 +35,7 @@ const riskConfig: Record<RiskLevel, { bg: string; text: string; border: string; 
     border: "border-orange-300",
     dateBg: "bg-orange-400",
     dateText: "text-white",
-    icon: "/icon/warning_yellow_light.svg",
+    icon: "/icon/warning_yellow.svg",
     shadow: "shadow-[inset_0_3px_10px_rgba(249,115,22,0.25)]",
   },
   "High Risk": {
@@ -55,7 +44,7 @@ const riskConfig: Record<RiskLevel, { bg: string; text: string; border: string; 
     border: "border-red-300",
     dateBg: "bg-red-400",
     dateText: "text-white",
-    icon: "/icon/warning_red_light.svg",
+    icon: "/icon/warning_red.svg",
     shadow: "shadow-[inset_0_3px_10px_rgba(220,38,38,0.25)]",
   },
 };
@@ -84,11 +73,46 @@ const statusConfig: Record<ReportHandlingStatus, { label: string; bg: string; te
 };
 
 const channelIcon: Record<string, React.ReactNode> = {
-  SMS: <FaSms />,
-  WhatsApp: <FaWhatsapp />,
-  Email: <MdOutlineEmail />,
-  Website: <CiGlobe />,
+  sms: <FaSms />,
+  whatsapp: <FaWhatsapp />,
+  email: <MdOutlineEmail />,
+  website: <CiGlobe />,
 };
+
+// ─────────────────────────────────────────────
+// Mapping helpers from API → display values
+// ─────────────────────────────────────────────
+function mapLabel(label: string): RiskLevel {
+  if (label === "high_risk") return "High Risk";
+  if (label === "medium_risk") return "Medium Risk";
+  return "Low Risk";
+}
+
+function mapStatus(status: string): ReportHandlingStatus {
+  if (status === "in_review") return "In Review";
+  if (status === "confirmed") return "Confirmed";
+  if (status === "closed") return "Closed";
+  return "Submitted";
+}
+
+function mapChannel(resource: string): string {
+  if (!resource) return "Unknown";
+  return resource.charAt(0).toUpperCase() + resource.slice(1);
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+}
 
 // ─────────────────────────────────────────────
 // Empty State Component
@@ -119,10 +143,13 @@ function EmptyReportStatus() {
 // ─────────────────────────────────────────────
 // Single Report Card Component
 // ─────────────────────────────────────────────
-function ReportStatusCard({ report }: { report: ReportItem }) {
-  const risk = riskConfig[report.riskLevel];
-  const status = statusConfig[report.status];
-  const icon = channelIcon[report.channel] ?? <Clock className="w-4 h-4" />;
+function ReportStatusCard({ report }: { report: ReportListItem }) {
+  const riskLevel = mapLabel(report.detection.label);
+  const status = mapStatus(report.ticket.status);
+  const channelKey = report.resource.toLowerCase();
+  const risk = riskConfig[riskLevel];
+  const statusStyle = statusConfig[status];
+  const icon = channelIcon[channelKey] ?? <Clock className="w-4 h-4" />;
 
   return (
     <Card className="group px-4 md:px-10 rounded-lg md:rounded-2xl border border-gray-200 shadow-md bg-neutral-50 transition-all duration-200 overflow-hidden">
@@ -131,23 +158,23 @@ function ReportStatusCard({ report }: { report: ReportItem }) {
         <div className="flex items-stretch md:items-start justify-between md:pt-4 pb-4">
           {/* Left: Ticket ID + Date */}
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-bold text-gray-800 border border-gray-400 rounded-sm md:rounded-lg px-3 py-1.5">{report.ticketId}</span>
+            <span className="text-sm font-bold text-gray-800 border border-gray-400 rounded-sm md:rounded-lg px-3 py-1.5">{report.ticket.code}</span>
             <div
               className={`flex items-center gap-1.5 ${risk.dateBg} ${risk.dateText} text-[10px] md:text-xs font-bold rounded-sm md:rounded-full px-3 py-1.5`}
             >
               <Clock className="w-3.5 h-3.5" />
-              {report.submittedAt}
+              {formatDate(report.ticket.created_at)}
             </div>
           </div>
 
           {/* Right: Status + Channel */}
           <div className="flex flex-col items-end gap-2 justify-between">
-            <span className={`text-[10px] md:text-xs font-bold px-2 py-1 md:px-4 md:py-1.5 rounded-full ${status.bg} ${status.text}`}>
-              {status.label}
+            <span className={`text-[10px] md:text-xs font-bold px-2 py-1 md:px-4 md:py-1.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
+              {statusStyle.label}
             </span>
             <div className="flex items-center gap-1.5 text-gray-600 text-sm font-medium">
               {icon}
-              <span>{report.channel}</span>
+              <span>{mapChannel(report.resource)}</span>
             </div>
           </div>
         </div>
@@ -161,13 +188,13 @@ function ReportStatusCard({ report }: { report: ReportItem }) {
           <div className={`flex flex-row items-center gap-3 border-2 ${risk.border} ${risk.bg} rounded-full px-2 py-1 bg-white ${risk.shadow}`}>
             <Image src={risk.icon} alt="Warning" width={20} height={20} className="w-6 h-6 shrink-0" />
             <div className="flex flex-col">
-              <span className={`text-[8px] uppercase tracking-wider ${risk.text}`}>{report.riskLevel}</span>
-              <span className={`text-xs leading-tight ${risk.text}`}>{report.riskScore}/100</span>
+              <span className={`text-[8px] uppercase tracking-wider ${risk.text}`}>{riskLevel}</span>
+              <span className={`text-xs leading-tight ${risk.text}`}>{report.detection.score}/100</span>
             </div>
           </div>
 
-          {/* Arrow */}
-          <Link href={`/report-status/${report.ticketId}`} className="transition-transform hover:scale-110 active:scale-95">
+          {/* Arrow — link to detail by report ID */}
+          <Link href={`/report-status/${report.id}`} className="transition-transform hover:scale-110 active:scale-95">
             <GrLinkNext className="w-4 h-4 md:w-6 md:h-6 text-gray-400 hover:text-gray-700 cursor-pointer" />
           </Link>
         </div>
@@ -177,50 +204,17 @@ function ReportStatusCard({ report }: { report: ReportItem }) {
 }
 
 // ─────────────────────────────────────────────
-// Sample data (replace with real API data later)
-// ─────────────────────────────────────────────
-const sampleReports: ReportItem[] = [
-  {
-    id: "1",
-    ticketId: "TKT-CIMB-6666",
-    submittedAt: "4 Apr 2026, 14:30",
-    channel: "WhatsApp",
-    riskScore: 95,
-    riskLevel: "High Risk",
-    status: "In Review",
-  },
-  {
-    id: "2",
-    ticketId: "TKT-CIMB-6664",
-    submittedAt: "4 Apr 2026, 13:33",
-    channel: "Website",
-    riskScore: 65,
-    riskLevel: "Medium Risk",
-    status: "Confirmed",
-  },
-  {
-    id: "3",
-    ticketId: "TKT-CIMB-6660",
-    submittedAt: "4 Apr 2026, 12:27",
-    channel: "SMS",
-    riskScore: 35,
-    riskLevel: "Low Risk",
-    status: "Closed",
-  },
-];
-
-// ─────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────
 interface ListReportStatusSectionProps {
-  reports?: ReportItem[];
+  reports?: ReportListItem[];
 }
 
-export default function ListReportStatusSection({ reports = sampleReports }: ListReportStatusSectionProps) {
+export default function ListReportStatusSection({ reports = [] }: ListReportStatusSectionProps) {
   const hasData = reports.length > 0;
 
   return (
-    <div className="w-full md:w-4/5 lg:w-1/2 mx-auto pt-10 pb-20">
+    <div className="w-full md:w-4/5 lg:w-1/2 mx-auto pb-20">
       <div className="flex flex-col gap-2">
         <div className="flex flex-col items-start justify-between mb-6 gap-2">
           <h2 className="text-lg md:text-xl lg:text-2xl font-extrabold text-gray-900">Reporting History</h2>

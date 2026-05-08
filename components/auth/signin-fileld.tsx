@@ -1,13 +1,88 @@
-import React from "react";
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+"use client";
+
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useRouter } from "next/navigation";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, Eye, Info, Link as LucideLink, Phone, Undo2 } from "lucide-react";
+import { Eye, EyeOff, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import BottomAuth from "@/components/auth/bottom-auth";
+import { useAuthStore } from "@/stores/useAuthStore";
+
+// ─── Zod Schema ────────────────────────────────────────────────
+const signinSchema = z.object({
+  email: z.string().min(1, "Email wajib diisi.").email("Format email tidak valid."),
+  password: z.string().min(1, "Password wajib diisi.").min(8, "Password minimal 8 karakter."),
+});
+
+type SigninFormValues = z.infer<typeof signinSchema>;
+
+// ───────────────────────────────────────────────────────────────
 
 export default function SigninField() {
+  const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SigninFormValues>({
+    resolver: zodResolver(signinSchema),
+  });
+
+  const onSubmit = async (data: SigninFormValues) => {
+    setIsLoading(true);
+    setServerError("");
+
+    try {
+      // Hanya urus login — ambil role dari response /login
+
+      //======================= Buat testing aja =======================
+      // const loginRes = await fetch("/api/login", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email: data.email, password: data.password }),
+      //   credentials: "include",
+      // });
+
+      // if (!loginRes.ok) {
+      //   const err = await loginRes.json();
+      //   throw new Error(err.message || "Email atau password salah.");
+      // }
+
+      // const loginData = await loginRes.json();
+      // const role = loginData.users?.role;
+
+      // Redirect berdasarkan role — layout tujuan akan fetch /me sendiri
+      // Di dalam onSubmit (untuk testing)
+
+      //======================= Buat testing aja =======================
+      const testRole = "user" as "user" | "admin";
+      const setUser = useAuthStore.getState().setUser({
+        userID: "dummy-id",
+        firstname: "Mark",
+        lastname: "Doe",
+        email: "mark@example.com",
+        is_verified: true,
+        role: testRole,
+      });
+
+      router.push(testRole === "admin" ? "/dashboard" : "/new-report");
+    } catch (err: any) {
+      setServerError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col justify-center items-center">
       {/* Back to home */}
@@ -19,9 +94,9 @@ export default function SigninField() {
       {/* Title */}
       <h1 className="text-xl lg:text-3xl font-bold mt-6 mb-10">Sign In and Stop Threats</h1>
 
-      {/* Input */}
-      <div className="flex flex-col w-full lg:w-9/12">
-        {/* Email Adress */}
+      {/* Form */}
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col w-full lg:w-9/12">
+        {/* Email */}
         <Field className="flex-1 mb-5">
           <FieldLabel htmlFor="email" className="flex items-center gap-2 text-sm lg:text-base">
             Email Address
@@ -31,7 +106,9 @@ export default function SigninField() {
             type="text"
             placeholder="name@company.com"
             className="h-8 md:h-12 bg-transparent border-gray-800 rounded-sm lg:rounded-lg text-xs lg:text-base"
+            {...register("email")}
           />
+          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
         </Field>
 
         {/* Password */}
@@ -40,9 +117,21 @@ export default function SigninField() {
             Password
           </FieldLabel>
           <div className="relative">
-            <Input id="password" type="password" className="h-8 md:h-12 bg-transparent border-gray-800 rounded-sm lg:rounded-lg pr-10" />
-            <Eye className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 cursor-pointer" />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              className="h-8 md:h-12 bg-transparent border-gray-800 rounded-sm lg:rounded-lg pr-10"
+              {...register("password")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
+          {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
         </Field>
 
         {/* Remember Me & Forgot Password */}
@@ -56,11 +145,18 @@ export default function SigninField() {
           </Link>
         </div>
 
-        {/* Signin Button */}
-        <Button className="w-full bg-red-900! hover:bg-red-800! text-white! py-5 md:py-6 text-base lg:text-lg lg:font-semibold rounded-sm lg:rounded-lg shadow-lg transition-all active:scale-[0.98] cursor-pointer">
-          Sign In
+        {/* Server Error */}
+        {serverError && <p className="text-red-600 text-sm text-center mb-3">{serverError}</p>}
+
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-red-900! hover:bg-red-800! text-white! py-5 md:py-6 text-base lg:text-lg lg:font-semibold rounded-sm lg:rounded-lg shadow-lg transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60"
+        >
+          {isLoading ? "Loading..." : "Sign In"}
         </Button>
-      </div>
+      </form>
 
       <div className="w-full h-[2px] bg-red-500 mt-5 opacity-50"></div>
 

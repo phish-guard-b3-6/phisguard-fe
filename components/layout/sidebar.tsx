@@ -3,24 +3,24 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
-import { LogOut, Search } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 interface SidebarProps {
   role: string;
   isLoggedIn: boolean;
   isMobile: boolean;
   setIsOpen: (open: boolean) => void;
-  setIsLoggedIn: (loggedIn: boolean) => void;
 }
 
-export default function Sidebar({ role, setIsOpen, setIsLoggedIn, isLoggedIn, isMobile }: SidebarProps) {
+export default function Sidebar({ role, setIsOpen, isLoggedIn, isMobile }: SidebarProps) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const setUser = useAuthStore((state) => state.setUser);
 
   const userItems = [
     { name: "New Report", href: "/new-report", icon: "new_report" },
@@ -38,6 +38,12 @@ export default function Sidebar({ role, setIsOpen, setIsLoggedIn, isLoggedIn, is
 
   const navItems = role === "admin" ? adminItems : userItems;
 
+  const handleLogout = () => {
+    setUser(null);
+    setIsOpen(false);
+    router.push("/signin");
+  };
+
   return (
     <>
       <div className="border-b border-red-500">
@@ -48,19 +54,16 @@ export default function Sidebar({ role, setIsOpen, setIsLoggedIn, isLoggedIn, is
             <Button
               variant="outline"
               className="w-full h-12 rounded-lg bg-red-800 text-white font-semibold cursor-pointer"
-              onClick={() => {
-                setIsLoggedIn(true);
-                setIsOpen(false);
-              }}
+              asChild
             >
-              Sign In
+              <Link href="/signin" onClick={() => setIsOpen(false)}>Sign In</Link>
             </Button>
           </SheetHeader>
         ) : (
-          <SheetHeader className="p-6  flex flex-row items-center gap-3 space-y-0">
+          <SheetHeader className="p-6 flex flex-row items-center gap-3 space-y-0">
             <Image src="/icon/logo_dark.svg" alt="Logo Perusahaan" width={32} height={32} />
             <SheetTitle className="text-lg md:text-xl font-bold mt-0">CIMB PhishGuard</SheetTitle>
-            <SheetDescription className="sr-only">Authentication sidebar for mobile guest users.</SheetDescription>
+            <SheetDescription className="sr-only">Main navigation sidebar.</SheetDescription>
           </SheetHeader>
         )}
       </div>
@@ -104,10 +107,7 @@ export default function Sidebar({ role, setIsOpen, setIsLoggedIn, isLoggedIn, is
           <Button
             variant="ghost"
             className="w-full justify-start px-4 h-12 gap-4 text-gray-900 hover:bg-red-50 hover:text-red-600 rounded-xl cursor-pointer font-semibold transition-all"
-            onClick={() => {
-              setIsLoggedIn(false);
-              setIsOpen(false);
-            }}
+            onClick={handleLogout}
           >
             <LogOut className="h-6 w-6" />
             Logout
@@ -117,3 +117,4 @@ export default function Sidebar({ role, setIsOpen, setIsLoggedIn, isLoggedIn, is
     </>
   );
 }
+

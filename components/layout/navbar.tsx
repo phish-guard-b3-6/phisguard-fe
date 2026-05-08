@@ -4,25 +4,24 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { Input } from "@/components/ui/input";
-import { Menu, Search, User, Sun, Moon, Bell, CircleQuestionMark, X } from "lucide-react";
+import { Menu, Search, Bell, X } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Sidebar from "./sidebar";
+import { useAuthStore } from "@/stores/useAuthStore";
 
-export default function Navbar({ role }: { role: string }) {
+export default function Navbar() {
+  const { user, isAuthenticated } = useAuthStore();
+  const role = user?.role ?? "user";
+
   const { theme, setTheme } = useTheme();
-  // const [mounted, setMounted] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Mencegah mismatch hydration: render ikon setelah mounted di client
   React.useEffect(() => {
-    // setMounted(true);
-
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -33,7 +32,7 @@ export default function Navbar({ role }: { role: string }) {
 
   return (
     <div className="flex items-center mx-4 md:gap-x-4 md:mx-10 p-2 h-fit">
-      {isLoggedIn || isMobile ? (
+      {isAuthenticated || isMobile ? (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className={`cursor-pointer ${isSearchOpen && isMobile ? "hidden" : "flex"}`}>
@@ -42,7 +41,7 @@ export default function Navbar({ role }: { role: string }) {
           </SheetTrigger>
 
           <SheetContent side={isMobile ? "top" : "left"} className={isMobile ? "p-0 flex-col h-full!" : "p-0 flex-col w-[350px]"}>
-            <Sidebar role={role} setIsOpen={setIsOpen} isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} isMobile={isMobile} />
+            <Sidebar role={role} setIsOpen={setIsOpen} isLoggedIn={isAuthenticated} isMobile={isMobile} />
           </SheetContent>
         </Sheet>
       ) : (
@@ -75,20 +74,25 @@ export default function Navbar({ role }: { role: string }) {
       </div>
 
       {/* Profile or Signin/Signup Button when > 768 */}
-      {isLoggedIn ? (
+      {isAuthenticated ? (
         <Link href="/profile" className="hidden md:flex items-center justify-center hover:opacity-80 transition-opacity">
-          <div className="h-9 w-9 bg-gray-100 rounded-full flex items-center justify-center border border-gray-200 shadow-sm">
-            <User className="h-5 w-5 text-gray-700" />
+          <div className="h-9 w-9 bg-red-600 rounded-full flex items-center justify-center border border-red-700 shadow-sm transition-transform hover:scale-105">
+            <span className="text-sm font-bold text-white">
+              {user?.firstname ? user.firstname[0].toUpperCase() : role === "admin" ? "A" : "U"}
+            </span>
           </div>
         </Link>
       ) : (
         <div className={`${isSearchOpen && isMobile ? "hidden" : "hidden md:flex"} gap-2`}>
-          <Button className="rounded-4xl py-1 h-fit text-xs" variant="outline" onClick={() => setIsLoggedIn(true)}>
-            Sign In
+          <Button className="rounded-4xl py-1 h-fit text-xs" variant="outline" asChild>
+            <Link href="/signin">Sign In</Link>
           </Button>
-          <Button className="rounded-4xl py-1 h-fit text-xs">Sign Up</Button>
+          <Button className="rounded-4xl py-1 h-fit text-xs" asChild>
+            <Link href="/signup">Sign Up</Link>
+          </Button>
         </div>
       )}
     </div>
   );
 }
+

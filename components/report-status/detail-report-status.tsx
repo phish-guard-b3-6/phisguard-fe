@@ -1,49 +1,177 @@
 import React from "react";
 import Image from "next/image";
-import { CheckCircle2, Ticket, BookOpen, Clock, ShieldAlert, AlertCircle, Check, Circle, Dot } from "lucide-react";
+import { CheckCircle2, Ticket, BookOpen, Clock, ShieldAlert, AlertCircle, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Report } from "@/lib/types/report";
 
-const handlingStatusSteps = [
+// ── Ticket status → step index (0-based) ──────────────────────────────────────
+const STATUS_STEP_MAP: Record<string, number> = {
+  submitted: 0,
+  in_review: 1,
+  confirmed: 2,
+  closed: 3,
+};
+
+const HANDLING_STEPS = [
   {
     id: 1,
     title: "Submitted",
     description: "Report successfully received by the system.",
-    status: "completed",
   },
   {
     id: 2,
     title: "In Review",
     description: "The report is currently being analyzed by the team.",
-    status: "active",
   },
   {
     id: 3,
     title: "Confirmed",
     description: "Verified as a confirmed phishing threat.",
-    status: "pending",
   },
   {
     id: 4,
     title: "Closed",
     description: "Case closed and mitigation actions completed.",
-    status: "pending",
   },
 ];
 
-const mlEngineResults = [
-  "Domain closely resembles the official CIMB Niaga website (Typosquatting).",
-  "Sender's number is listed in the internal Blacklist database.",
-  "Message contains urgency patterns commonly used by scammers.",
-];
+// ── Risk level helpers ────────────────────────────────────────────────────────
+type RiskConfig = {
+  borderColor: string;
+  badgeBorder: string;
+  badgeBg: string;
+  badgeShadow: string;
+  textColor: string;
+  dateBg: string;
+  topBorder: string;
+  icon: string;
+  label: string;
+  alertTitle: string;
+  alertBody: string;
+  btnBg: string;
+  btnHoverBg: string;
+  btnShadow: string;
+  bgIcon: string;
+  bgOpacity: number;
+  recommendations: string[];
+};
 
-const securityRecommendations = [
-  "Never click on the provided link.",
-  "Never give your OTP, PIN, or password to anyone.",
-  "Block the sender's number on your device.",
-];
+function getRiskConfig(label: string): RiskConfig {
+  if (label === "high_risk") {
+    return {
+      borderColor: "border-l-red-600",
+      badgeBorder: "border-red-700",
+      badgeBg: "bg-white",
+      badgeShadow: "shadow-[inset_0_3px_10px_rgba(220,38,38,0.25)]",
+      textColor: "text-red-600",
+      dateBg: "bg-red-300",
+      topBorder: "border-t-red-600",
+      icon: "/icon/warning_red.svg",
+      bgIcon: "/icon/warning_red_bg.svg",
+      label: "High Risk",
+      alertTitle: "High-Level Security Alert",
+      alertBody: "Based on our system analysis, your report is highly likely to be a phishing attempt.",
+      btnBg: "bg-[#7a1b1b]!",
+      btnHoverBg: "hover:bg-[#631616]!",
+      btnShadow: "shadow-red-100",
+      bgOpacity: 0.15,
+      recommendations: [
+        "Never click on the provided link.",
+        "Never give your OTP, PIN, or password to anyone.",
+        "Block the sender's number on your device.",
+      ],
+    };
+  }
+  if (label === "medium_risk") {
+    return {
+      borderColor: "border-l-yellow-500",
+      badgeBorder: "border-yellow-600",
+      badgeBg: "bg-white",
+      badgeShadow: "shadow-[inset_0_3px_10px_rgba(234,179,8,0.25)]",
+      textColor: "text-yellow-600",
+      dateBg: "bg-yellow-200",
+      topBorder: "border-t-yellow-500",
+      icon: "/icon/warning_yellow.svg",
+      bgIcon: "/icon/warning_yellow_bg.svg",
+      label: "Medium Risk",
+      alertTitle: "Medium-Level Security Alert",
+      alertBody: "Based on our system analysis, your report has a moderate probability of being a phishing attempt.",
+      btnBg: "bg-yellow-600!",
+      btnHoverBg: "hover:bg-yellow-700!",
+      btnShadow: "shadow-yellow-100",
+      bgOpacity: 1,
+      recommendations: [
+        "Delay any interaction with this link or sender.",
+        "Verify the information through the official contacts of the relevant company.",
+        "Do not download or open any attached files.",
+      ],
+    };
+  }
+  // low_risk
+  return {
+    borderColor: "border-l-green-600",
+    badgeBorder: "border-green-700",
+    badgeBg: "bg-white",
+    badgeShadow: "shadow-[inset_0_3px_10px_rgba(22,163,74,0.25)]",
+    textColor: "text-green-600",
+    dateBg: "bg-green-200",
+    topBorder: "border-t-green-600",
+    icon: "/icon/warning_green.svg",
+    bgIcon: "/icon/warning_green_bg.svg",
+    label: "Low Risk",
+    alertTitle: "Low-Level Security Notice",
+    alertBody: "Based on our system analysis, your report has a low probability of being a phishing attempt. Stay cautious.",
+    btnBg: "bg-green-700!",
+    btnHoverBg: "hover:bg-green-800!",
+    btnShadow: "shadow-green-100",
+    bgOpacity: 1,
+    recommendations: [
+      "Stay vigilant if asked to provide personal identity data.",
+      "Ensure the URL always uses 'https://' and is not a fake website.",
+      "Report back if you notice any further strange activities or messages.",
+    ],
+  };
+}
 
-export default function DetailReportStatusSection() {
+function formatDate(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+interface DetailReportStatusSectionProps {
+  report: Report | null;
+}
+
+export default function DetailReportStatusSection({ report }: DetailReportStatusSectionProps) {
+  if (!report) {
+    return (
+      <div className="w-full max-w-4xl mx-auto pt-10 pb-20 text-center text-gray-500">
+        <p className="text-lg font-semibold">Report not found.</p>
+        <p className="text-sm mt-2">Please check the Ticket ID and try again.</p>
+      </div>
+    );
+  }
+
+  const risk = getRiskConfig(report.detection.label);
+  const activeStepIndex = STATUS_STEP_MAP[report.ticket.status] ?? 0;
+
+  const mlEngineResults = [
+    "Domain closely resembles the official CIMB Niaga website (Typosquatting).",
+    report.is_blacklisted ? "Sender's number is listed in the internal Blacklist database." : "Sender's number is not currently in the blacklist.",
+    "Message contains urgency patterns commonly used by scammers.",
+  ];
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 pt-10 pb-20">
       {/* Report Successfully Received Card */}
@@ -61,46 +189,41 @@ export default function DetailReportStatusSection() {
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-3 bg-white border border-gray-300 rounded-sm px-4 py-3 shadow-sm">
               <Ticket className="w-5 h-5 text-gray-500" />
-              <span className="text-sm md:text-base font-semibold text-gray-900 tracking-widest">TKT-CIMB-6666</span>
+              <span className="text-sm md:text-base font-semibold text-gray-900 tracking-widest">{report.ticket.code}</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* High-Level Security Alert Card */}
-      <Card className="relative overflow-hidden rounded-xl border-y border-r border-l-4 border-gray-200 border-l-red-600 shadow-sm bg-[#fafafa]">
-        {/* Faint watermark image on the right */}
-        <div className="hidden md:block md:absolute top-0 right-0 opacity-10 pointer-events-none">
-          <Image
-            src="/icon/warning_red_bg_light.svg"
-            alt="Warning Background"
-            width={200}
-            height={200}
-            className="w-[150px] h-[150px] md:w-[200px] md:h-[200px]"
-          />
+      {/* Security Alert Card — severity adapts to risk level */}
+      <Card className={`relative overflow-hidden rounded-xl border-y border-r border-l-4 border-gray-200 ${risk.borderColor} shadow-sm bg-[#fafafa]`}>
+        <div className="hidden md:block md:absolute top-0 right-0 z-0 pointer-events-none" style={{ opacity: risk.bgOpacity }}>
+          <Image src={risk.bgIcon} alt="Warning Background" width={200} height={200} className="w-[150px] h-[150px] md:w-[200px] md:h-[200px]" />
         </div>
 
         <CardContent className="md:p-6 relative z-10">
           <div className="flex items-center gap-3 mb-4">
-            <Image src="/icon/warning_red_light.svg" alt="Warning Icon" width={24} height={24} className="w-6 h-6" />
-            <h2 className="text-base md:text-xl font-bold text-gray-900 tracking-tight">High-Level Security Alert</h2>
+            <Image src={risk.icon} alt="Warning Icon" width={24} height={24} className="w-6 h-6" />
+            <h2 className="text-base md:text-xl font-bold text-gray-900 tracking-tight">{risk.alertTitle}</h2>
           </div>
 
           <p className="font-light text-xs md:text-sm lg:text-base mb-4 leading-relaxed">
-            Based on our system analysis, your report is highly likely to be a phishing attempt.
+            {risk.alertBody}
             <br />
             Please note the following:
           </p>
 
           <ul className="font-light text-xs md:text-sm lg:text-base list-disc list-outside text-gray-800 mb-4 pl-5">
-            {securityRecommendations.map((recommendation, index) => (
-              <li key={index} className="leading-relaxed">
-                {recommendation}
+            {risk.recommendations.map((rec: string, i: number) => (
+              <li key={i} className="leading-relaxed">
+                {rec}
               </li>
             ))}
           </ul>
 
-          <Button className="bg-[#7a1b1b]! hover:bg-[#631616]! text-white p-4 md:p-6 text-sm md:text-sm lg:text-base rounded-xl shadow-md shadow-red-100 transition-all active:scale-[0.98] border-none cursor-pointer">
+          <Button
+            className={`${risk.btnBg} ${risk.btnHoverBg} text-white p-4 md:p-6 text-sm md:text-sm lg:text-base rounded-xl shadow-md ${risk.btnShadow} transition-all active:scale-[0.98] border-none cursor-pointer`}
+          >
             <BookOpen className="w-5! h-5! mr-2" />
             Learn About This Phishing Method
           </Button>
@@ -108,7 +231,7 @@ export default function DetailReportStatusSection() {
       </Card>
 
       {/* Ticket Details & Handling Status Card */}
-      <Card className="rounded-xl border-x border-b border-t-8 border-gray-200 border-t-red-600 shadow-sm bg-[#fafafa]">
+      <Card className={`rounded-xl border-x border-b border-t-8 border-gray-200 ${risk.topBorder} shadow-sm bg-[#fafafa]`}>
         <CardContent className="px-6 md:px-8 space-y-6">
           {/* Header Section */}
           <div className="flex flex-row justify-between items-start gap-4">
@@ -117,74 +240,78 @@ export default function DetailReportStatusSection() {
               <div className="flex flex-wrap items-center gap-2 md:gap-3">
                 <div className="inline-flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 md:px-3 py-1 md:py-1.5 shadow-sm">
                   <Ticket className="w-3 h-3 md:w-4 md:h-4 text-gray-600" />
-                  <span className="text-xs md:text-sm font-semibold text-gray-700">TKT-CIMB-6666</span>
+                  <span className="text-xs md:text-sm font-semibold text-gray-700">{report.ticket.code}</span>
                 </div>
-                <div className="inline-flex items-center gap-2 bg-red-300 rounded-lg px-2 md:px-3 py-1 md:py-1.5 shadow-sm">
+                <div className={`inline-flex items-center gap-2 ${risk.dateBg} rounded-lg px-2 md:px-3 py-1 md:py-1.5 shadow-sm`}>
                   <Clock className="w-3 h-3 md:w-4 md:h-4" />
-                  <span className="text-xs md:text-sm font-bold">4 Apr 2026, 14:45</span>
+                  <span className="text-xs md:text-sm font-bold">{formatDate(report.ticket.created_at)}</span>
                 </div>
               </div>
             </div>
 
             {/* Risk Badge */}
-            <div className="flex flex-row items-center gap-2 md:gap-3 border-2 border-red-700 rounded-full px-3 md:px-5 py-1 bg-white shadow-[inset_0_3px_10px_rgba(220,38,38,0.25)] shrink-0">
-              <Image src="/icon/warning_red_light.svg" alt="Warning" width={36} height={36} className="w-6 h-6 md:w-9 md:h-9 shrink-0" />
+            <div
+              className={`flex flex-row items-center gap-2 md:gap-3 border-2 ${risk.badgeBorder} rounded-full px-3 md:px-5 py-1 ${risk.badgeBg} ${risk.badgeShadow} shrink-0`}
+            >
+              <Image src={risk.icon} alt="Warning" width={36} height={36} className="w-6 h-6 md:w-9 md:h-9 shrink-0" />
               <div className="flex flex-col">
-                <p className="text-[8px] md:text-xs font-bold text-red-600 uppercase tracking-wider">High Risk</p>
-                <p className="text-lg md:text-xl lg:text-2xl font-black text-red-600 leading-tight">95/100</p>
+                <p className={`text-[8px] md:text-xs font-bold ${risk.textColor} uppercase tracking-wider`}>{risk.label}</p>
+                <p className={`text-lg md:text-xl lg:text-2xl font-black ${risk.textColor} leading-tight`}>{report.detection.score}/100</p>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-red-600 w-full" />
+          <div className={`border-t w-full ${risk.textColor.replace("text-", "border-")}`} />
 
           {/* Handling Status Timeline */}
           <div className="space-y-6">
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold tracking-tight">Handling Status</h3>
 
             <div className="relative flex flex-col md:grid md:grid-cols-4 gap-6 md:gap-4 px-2">
-              {/* Connector Line Background (Desktop Only) */}
+              {/* Connector Line (Desktop) */}
               <div className="hidden md:block absolute top-6 left-[12.5%] right-[12.5%] h-[2px] bg-gray-200 z-0" />
 
-              {handlingStatusSteps.map((step) => (
-                <div
-                  key={step.id}
-                  className="relative flex flex-row md:flex-col items-center md:items-center gap-4 md:gap-0 z-10 text-left md:text-center"
-                >
-                  {/* Step Icon Generator */}
-                  <div className="flex items-center justify-center shrink-0 w-12 h-12 md:mb-4">
-                    {step.status === "completed" && (
-                      <div className="w-10 h-10 bg-white rounded-full border-2 border-gray-300 flex items-center justify-center z-10">
-                        <Check className="w-5 h-5 text-gray-400 stroke-[3px]" />
-                      </div>
-                    )}
-                    {step.status === "active" && (
-                      <div className="relative w-12 h-12 flex items-center justify-center">
-                        <div className="absolute inset-0 rounded-full border-2 border-dotted border-gray-400" />
-                        <div className="w-9 h-9 rounded-full border-[3px] border-black bg-white z-10" />
-                      </div>
-                    )}
-                    {step.status === "pending" && (
-                      <div className="w-10 h-10 bg-white rounded-full border-2 border-gray-300 flex items-center justify-center z-10">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                      </div>
-                    )}
-                  </div>
+              {HANDLING_STEPS.map((step, idx) => {
+                const stepStatus = idx < activeStepIndex ? "completed" : idx === activeStepIndex ? "active" : "pending";
 
-                  <div className="flex flex-col">
-                    <p className={`text-base lg:text-lg ${step.status === "active" ? "text-gray-900" : "text-gray-400"}`}>{step.title}</p>
-                    <p
-                      className={`text-xs lg:text-sm max-w-[250px] md:max-w-[120px] ${step.status === "active" ? "font-light" : "text-gray-400 font-light"}`}
-                    >
-                      {step.description}
-                    </p>
+                return (
+                  <div
+                    key={step.id}
+                    className="relative flex flex-row md:flex-col items-center md:items-center gap-4 md:gap-0 z-10 text-left md:text-center"
+                  >
+                    {/* Step Icon */}
+                    <div className="flex items-center justify-center shrink-0 w-12 h-12 md:mb-4">
+                      {stepStatus === "completed" && (
+                        <div className="w-10 h-10 bg-white rounded-full border-2 border-gray-300 flex items-center justify-center z-10">
+                          <Check className="w-5 h-5 text-gray-400 stroke-[3px]" />
+                        </div>
+                      )}
+                      {stepStatus === "active" && (
+                        <div className="relative w-12 h-12 flex items-center justify-center">
+                          <div className="absolute inset-0 rounded-full border-2 border-dotted border-gray-400" />
+                          <div className="w-9 h-9 rounded-full border-[3px] border-black bg-white z-10" />
+                        </div>
+                      )}
+                      {stepStatus === "pending" && (
+                        <div className="w-10 h-10 bg-white rounded-full border-2 border-gray-300 flex items-center justify-center z-10">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <p className={`text-base lg:text-lg ${stepStatus === "active" ? "text-gray-900" : "text-gray-400"}`}>{step.title}</p>
+                      <p className={`text-xs lg:text-sm max-w-[250px] md:max-w-[120px] font-light ${stepStatus !== "active" ? "text-gray-400" : ""}`}>
+                        {step.description}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* ML Engine Analysis Box */}
+          {/* ML Engine Analysis */}
           <div className="bg-[#f0f0f0] rounded-xl border border-gray-200 p-6 md:p-8 space-y-4 md:space-y-6 shadow-inset-sm">
             <div className="flex items-center gap-3">
               <ShieldAlert className="w-6 h-6 md:w-8 md:h-8 text-gray-900" />
