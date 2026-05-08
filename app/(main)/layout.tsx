@@ -1,15 +1,8 @@
-import Footer from "@/components/layout/footer";
-import Navbar from "@/components/layout/navbar";
+import MainLayout from "@/components/layout/main-layout";
 import React from "react";
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col min-h-screen ">
-      <Navbar role={"user"} />
-      <main className="flex justify-center w-full flex-1 px-8 md:px-12 lg:px-0">{children}</main>
-      {/* <Footer /> */}
-    </div>
-  );
+  return <MainLayout role="user">{children}</MainLayout>;
 }
 //  className={[
 //         "flex flex-col min-h-screen",

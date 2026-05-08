@@ -166,10 +166,10 @@ function ModulesPageContent() {
   const activeModule = modules.find((m) => m.id === activeModuleId) ?? modules[0];
 
   return (
-    <div className="w-full md:w-4/5 lg:w-2/3 mx-auto md:px-6 pt-10 pb-20">
+    <div className="w-full md:w-4/5 lg:w-2/3 mx-auto md:px-6 pb-20">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight mb-2">Basic Phishing Detection Guide</h1>
+        <h1 className="text-xl md:text-2xl lg:text-2xl font-extrabold text-gray-900 tracking-tight mb-2">Basic Phishing Detection Guide</h1>
         <p className="text-xs md:text-sm lg:text-base font-light w-full">
           Complete the modules and tasks below at your own pace to enhance your understanding of phishing threats.
         </p>

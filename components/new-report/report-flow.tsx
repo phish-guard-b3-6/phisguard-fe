@@ -16,7 +16,7 @@ export default function ReportFlow() {
   return (
     <div className="w-full md:w-auto">
       {/* Title and Description */}
-      <div className="hidden md:flex flex-col items-center gap-2 my-5 w-full">
+      <div className="hidden md:flex flex-col items-center gap-2 w-full">
         <div className="flex items-center gap-5">
           <Image src="/icon/logo_dark.svg" alt="Logo Perusahaan" width={40} height={40} className="md:w-10 md:h-10 lg:w-16 lg:h-16" />
           <h1 className="text-2xl lg:text-3xl font-bold">CIMB PhishGuard</h1>
