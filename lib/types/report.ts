@@ -36,8 +36,18 @@ export interface ReportApiResponse {
   reports: Report;
 }
 
-// ── List Endpoint ─────────────────────────────────────────────────────────────
-// Response shape: { message, reports: [ { reports: [ ReportListItem ] } ] }
+export type ResourceOption = "sms" | "whatsapp" | "email" | "web";
+
+export type ReportType = "url" | "phone";
+
+export interface CreateReportPayload {
+  message: string;
+  value: string;         // URL jika type="url", nomor HP jika type="phone"
+  type: ReportType;      // menentukan isi dari field value
+  resource: ResourceOption;
+  description: string;
+  is_anonymous: boolean;
+}
 
 export interface ReportListItem {
   id: string;

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { signupSchema, SignupFormValues } from "@/schemas/auth";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff, Undo2 } from "lucide-react";
@@ -12,34 +12,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import BottomAuth from "@/components/auth/bottom-auth";
 import { useRouter } from "next/navigation";
-
-// ─── Zod Schema ────────────────────────────────────────────────
-const signupSchema = z
-  .object({
-    firstname: z.string().min(1, "First Name is required."),
-    lastname: z.string().min(1, "Last Name is required."),
-    email: z.string().min(1, "Email is required.").email("Invalid email format."),
-    username: z.string().min(1, "Username is required."),
-    password: z.string().min(8, "Password must be at least 8 characters."),
-    confirmPassword: z.string().min(1, "Please confirm your password."),
-    isAffiliated: z.boolean(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
-
-type SignupFormValues = z.infer<typeof signupSchema>;
-
-// ───────────────────────────────────────────────────────────────
+import { useMutation } from "@tanstack/react-query";
+import { axiosInstance } from "@/lib/axios";
+import { toast } from "sonner";
+import { RegisterPayload } from "@/lib/types/auth";
 
 export default function SignupField() {
   const router = useRouter();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
@@ -53,38 +35,38 @@ export default function SignupField() {
     },
   });
 
-  const onSubmit = async (data: SignupFormValues) => {
-    setIsLoading(true);
-    setServerError(null);
+  // Mutation tanstack ───────────────────────────────────────────────────────────────
+  const { mutate: registerMutation, isPending: isSubmitting } = useMutation({
+    mutationFn: (payload: RegisterPayload) => axiosInstance.post("/users/register", payload),
+    onSuccess: () => {
+      toast.success("Akun berhasil dibuat!", {
+        description: "Silakan login untuk melanjutkan.",
+      });
+      router.push("/signin");
+    },
+    onError: (err: unknown) => {
+      // Axios membungkus response backend di dalam err.response.data
+      // Tanpa ini, kita hanya mendapat pesan generic "Request failed with status code 400"
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Terjadi kesalahan, coba lagi nanti.";
+      toast.error("Gagal membuat akun", { description: message });
+    },
+  });
 
-    const body = {
+  const onSubmit = (data: SignupFormValues) => {
+    console.log(data.firstname);
+    console.log(data.lastname);
+    console.log(data.email);
+    console.log(data.username);
+    console.log(data.password);
+    console.log(data.isAffiliated);
+    registerMutation({
       firstname: data.firstname,
       lastname: data.lastname,
       email: data.email,
       username: data.username,
       password: data.password,
       is_affiliated: data.isAffiliated,
-    };
-
-    try {
-      // const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(body),
-      // });
-
-      // if (!res.ok) {
-      //   const errData = await res.json().catch(() => null);
-      //   throw new Error(errData?.message ?? `Request failed with status ${res.status}`);
-      // }
-
-      // Registration successful — redirect to login
-      router.push("/login");
-    } catch (err: any) {
-      setServerError(err.message || "An unexpected error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   return (
@@ -231,16 +213,13 @@ export default function SignupField() {
           </FieldGroup>
         </div>
 
-        {/* Server Error message */}
-        {serverError && <p className="w-full text-xs md:text-sm text-red-600 mb-3">{serverError}</p>}
-
         {/* Signup Button */}
         <Button
           type="submit"
           className="w-full bg-red-900! hover:bg-red-800! text-white! py-5 md:py-6 text-base lg:text-lg lg:font-semibold rounded-sm lg:rounded-lg shadow-lg transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60"
-          disabled={isLoading}
+          disabled={isSubmitting}
         >
-          {isLoading ? "Creating account..." : "Sign Up"}
+          {isSubmitting ? "Creating account..." : "Sign Up"}
         </Button>
       </form>
 
@@ -252,7 +231,7 @@ export default function SignupField() {
       {/* Sign In link */}
       <p className="mt-6 lg:mt-8 text-center text-black text-sm md:text-base">
         Already have an account?{" "}
-        <Link href="/login" className="text-red-500! font-semibold lg:font-bold hover:underline cursor-pointer">
+        <Link href="/signin" className="text-red-500! font-semibold lg:font-bold hover:underline cursor-pointer">
           Sign in
         </Link>
       </p>

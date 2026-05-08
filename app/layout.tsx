@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
+import QueryProvider from "@/providers/query-providers";
 
 // ── Goli Font (local) ──────────────────────────────────────────────────────
 // Font files located at app/fonts/
@@ -45,11 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("h-full antialiased", goli.variable)}
-    >
+    <html lang="en" suppressHydrationWarning className={cn("h-full antialiased", goli.variable)}>
       <body
         className={cn(
           "flex flex-col min-h-screen font-goli",
@@ -59,7 +57,8 @@ export default function RootLayout({
         )}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          {children}
+          <QueryProvider>{children}</QueryProvider>
+          <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>
     </html>

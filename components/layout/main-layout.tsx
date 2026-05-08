@@ -2,38 +2,39 @@
 "use client";
 
 import React from "react";
-// TODO (PRODUCTION): import { useEffect } from "react";
-// TODO (PRODUCTION): import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/navbar";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
-  // TODO (PRODUCTION): const { user, fetchCurrentUser } = useAuthStore();
-  // TODO (PRODUCTION): const router = useRouter();
+  const { user, fetchCurrentUser } = useAuthStore();
+  const router = useRouter();
 
   // ======================= PRODUCTION: Aktifkan kembali saat API sudah siap =======================
-  // useEffect(() => {
-  //   // Hanya fetch /me jika user belum ada di Zustand.
-  //   // Kasus ini terjadi saat user me-refresh halaman (Zustand direset).
-  //   if (!user) {
-  //     fetchCurrentUser().then((fetchedUser) => {
-  //       if (!fetchedUser) {
-  //         // Jika fetch /me gagal (sesi habis), arahkan ke halaman login
-  //         router.replace("/signin");
-  //         return;
-  //       }
-  //
-  //       // Guard: pastikan role yang mengakses sesuai
-  //       // Misal user biasa coba akses /dashboard (admin page)
-  //       if (fetchedUser.role !== "admin") {
-  //         router.replace("/new-report");
-  //       } else if (fetchedUser.role === "admin") {
-  //         router.replace("/dashboard");
-  //       }
-  //     });
-  //   }
-  // }, []);
+  useEffect(() => {
+    // Hanya fetch /me jika user belum ada di Zustand.
+    // Kasus ini terjadi saat user me-refresh halaman (Zustand direset).
+    if (!user) {
+      fetchCurrentUser().then((fetchedUser) => {
+        // [TESTING]: Sementara matikan redirect agar bisa akses page (main)
+        if (!fetchedUser) {
+          // Jika fetch /me gagal (sesi habis), arahkan ke halaman login
+          router.replace("/signin");
+          return;
+        }
+
+        // [TESTING]: Sementara matikan guard role
+        // Guard: pastikan role yang mengakses sesuai
+        // Misal user biasa coba akses /dashboard (admin page)
+        if (fetchedUser.role !== "admin" && window.location.pathname.startsWith("/dashboard")) {
+          router.replace("/new-report");
+        } else if (fetchedUser.role === "admin" && window.location.pathname.startsWith("/new-report")) {
+          router.replace("/dashboard");
+        }
+      });
+    }
+  }, [user, fetchCurrentUser, router]);
   // =================================================================================================
 
   return (
@@ -43,4 +44,3 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     </div>
   );
 }
-
