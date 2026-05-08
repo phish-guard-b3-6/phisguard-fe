@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { signinSchema, SigninFormValues } from "@/schemas/auth";
 import { useRouter } from "next/navigation";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -13,22 +13,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import BottomAuth from "@/components/auth/bottom-auth";
 import { useAuthStore } from "@/stores/useAuthStore";
-
-// ─── Zod Schema ────────────────────────────────────────────────
-const signinSchema = z.object({
-  email: z.string().min(1, "Email wajib diisi.").email("Format email tidak valid."),
-  password: z.string().min(1, "Password wajib diisi.").min(8, "Password minimal 8 karakter."),
-});
-
-type SigninFormValues = z.infer<typeof signinSchema>;
-
-// ───────────────────────────────────────────────────────────────
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { LoginPayload, LoginApiResponse } from "@/lib/types/auth";
 
 export default function SigninField() {
   const router = useRouter();
+  const { fetchCurrentUser } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
-  const [serverError, setServerError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
@@ -38,49 +30,46 @@ export default function SigninField() {
     resolver: zodResolver(signinSchema),
   });
 
-  const onSubmit = async (data: SigninFormValues) => {
-    setIsLoading(true);
-    setServerError("");
-
-    try {
-      // Hanya urus login — ambil role dari response /login
-
-      //======================= Buat testing aja =======================
-      // const loginRes = await fetch("/api/login", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email: data.email, password: data.password }),
-      //   credentials: "include",
-      // });
-
-      // if (!loginRes.ok) {
-      //   const err = await loginRes.json();
-      //   throw new Error(err.message || "Email atau password salah.");
-      // }
-
-      // const loginData = await loginRes.json();
-      // const role = loginData.users?.role;
-
-      // Redirect berdasarkan role — layout tujuan akan fetch /me sendiri
-      // Di dalam onSubmit (untuk testing)
-
-      //======================= Buat testing aja =======================
-      const testRole = "user" as "user" | "admin";
-      const setUser = useAuthStore.getState().setUser({
-        userID: "dummy-id",
-        firstname: "Mark",
-        lastname: "Doe",
-        email: "mark@example.com",
-        is_verified: true,
-        role: testRole,
+  // Mutation tanstack ───────────────────────────────────────────────────────────────
+  const { mutate: loginMutation, isPending: isSubmitting } = useMutation<LoginApiResponse, Error, LoginPayload>({
+    mutationFn: async (payload: LoginPayload): Promise<LoginApiResponse> => {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      router.push(testRole === "admin" ? "/dashboard" : "/new-report");
-    } catch (err: any) {
-      setServerError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData?.message ?? "Login gagal.");
+      }
+
+      return res.json();
+    },
+    onSuccess: async () => {
+      try {
+        // Setelah login berhasil dan cookie diset, panggil /me untuk mendapatkan full profile (termasuk role)
+        const userProfile = await fetchCurrentUser();
+
+        if (userProfile) {
+          toast.success("Login berhasil!", { description: `Selamat datang, ${userProfile.firstname}.` });
+          // Redirect berdasarkan role dari /me
+          router.push(userProfile.role === "admin" ? "/dashboard" : "/new-report");
+        } else {
+          throw new Error("Gagal memuat profil pengguna.");
+        }
+      } catch (error) {
+        toast.error("Terjadi kesalahan setelah login.");
+      }
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Email atau password salah.";
+      toast.error("Login gagal", { description: message });
+    },
+  });
+
+  const onSubmit = (data: SigninFormValues) => {
+    loginMutation({ email: data.email, password: data.password });
   };
 
   return (
@@ -145,16 +134,13 @@ export default function SigninField() {
           </Link>
         </div>
 
-        {/* Server Error */}
-        {serverError && <p className="text-red-600 text-sm text-center mb-3">{serverError}</p>}
-
         {/* Submit Button */}
         <Button
           type="submit"
-          disabled={isLoading}
+          disabled={isSubmitting}
           className="w-full bg-red-900! hover:bg-red-800! text-white! py-5 md:py-6 text-base lg:text-lg lg:font-semibold rounded-sm lg:rounded-lg shadow-lg transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60"
         >
-          {isLoading ? "Loading..." : "Sign In"}
+          {isSubmitting ? "Loading..." : "Sign In"}
         </Button>
       </form>
 
@@ -166,7 +152,7 @@ export default function SigninField() {
       {/* SignUp Button */}
       <p className="mt-6 lg:mt-8 text-center text-black text-sm md:text-base">
         Not a member?{" "}
-        <Link href="/login" className="text-red-500! font-semibold lg:font-bold hover:underline cursor-pointer">
+        <Link href="/signup" className="text-red-500! font-semibold lg:font-bold hover:underline cursor-pointer">
           Sign up
         </Link>
       </p>

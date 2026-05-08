@@ -2,7 +2,7 @@ import MainLayout from "@/components/layout/main-layout";
 import React from "react";
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
-  return <MainLayout role="user">{children}</MainLayout>;
+  return <MainLayout>{children}</MainLayout>;
 }
 //  className={[
 //         "flex flex-col min-h-screen",

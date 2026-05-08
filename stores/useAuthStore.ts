@@ -1,14 +1,14 @@
 // store/useAuthStore.ts
 import { create } from "zustand";
 
-// Struktur data ini persis dengan kembalian endpoint /me Anda
+// Struktur data ini persis dengan kembalian endpoint /login
 interface UserProfile {
   userID: string;
   firstname: string;
   lastname: string;
   email: string;
-  is_verified: boolean;
   role: "user" | "admin";
+  is_verified: boolean;
 }
 
 interface AuthState {
@@ -46,4 +46,3 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 }));
-

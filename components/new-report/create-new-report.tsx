@@ -3,14 +3,14 @@
 import React, { useState } from "react";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Info, Link, MessageSquareMore, Phone } from "lucide-react";
+import { Info, Link, MessageSquareMore, Phone, CheckSquare } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ReportApiResponse } from "@/lib/types/report";
-
-// ── Resource options ─────────────────────────────────────────────────────────
-type ResourceOption = "sms" | "whatsapp" | "email" | "web" | "";
+import { CreateReportPayload, ResourceOption, ReportType } from "@/lib/types/report";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { axiosInstance } from "@/lib/axios";
+import { toast } from "sonner";
 
 interface CreateNewReportProps {
   setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
@@ -18,86 +18,133 @@ interface CreateNewReportProps {
 
 export default function CreateNewReport({ setIsSubmitted }: CreateNewReportProps) {
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [url, setUrl] = useState("");
-  const [senderNumber, setSenderNumber] = useState("");
+  const [value, setValue] = useState(""); // isi URL atau nomor HP
   const [message, setMessage] = useState("");
-  const [resource, setResource] = useState<ResourceOption>("");
+  const [resource, setResource] = useState<ResourceOption | "">("");
   const [description, setDescription] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
+  const [reportType, setReportType] = useState<ReportType>("url");
 
-  // ── UI state ────────────────────────────────────────────────────────────────
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Mutation tanstack ────────────────────────────────────────────────────────────────
+  const { mutate: createReportMutation, isPending: isSubmitting } = useMutation({
+    mutationFn: (payload: CreateReportPayload) => axiosInstance.post("/reports", payload),
+    onSuccess: () => {
+      // Invalidasi cache agar data terbaru langsung di-fetch oleh ListReportStatusPage
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      
+      toast.success("Laporan berhasil dikirim!", {
+        description: "Tim kami akan segera menindaklanjuti laporan Anda.",
+      });
+      setIsSubmitted(true);
+    },
+    onError: (err: unknown) => {
+      // Mengambil pesan error detail dari response backend (BFF/External Backend)
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        "Terjadi kesalahan, coba lagi nanti.";
+      
+      toast.error("Gagal mengirim laporan", { 
+        description: message 
+      });
+    },
+  });
 
   // ── Submit handler ──────────────────────────────────────────────────────────
-  async function handleSubmit() {
-    setError(null);
-    setIsLoading(true);
+  function handleSubmit() {
+    if (!resource) {
+      toast.error("Pilih sumber pesan terlebih dahulu.");
+      return;
+    }
 
-    const body = {
+    createReportMutation({
       message,
-      url,
-      sender_number: senderNumber,
+      value, // URL atau nomor HP sesuai pilihan user
+      type: reportType,
       resource,
       description,
       is_anonymous: isAnonymous,
-    };
-
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/reports`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        throw new Error(errData?.message ?? `Request failed with status ${res.status}`);
-      }
-
-      const data: ReportApiResponse = await res.json();
-      console.log("Report submitted:", data);
-
-      setIsSubmitted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
+    });
   }
 
   return (
-    <div className="flex flex-col items-center mb-5 md:gap-2 w-full ">
-      {/* URL & Sender Phone Number */}
-      <div className="flex flex-col md:flex-row gap-5 md:gap-10 mt-5 lg:mt-8 mb-5 w-full">
-        <Field className="flex-1">
-          <FieldLabel htmlFor="url" className="flex items-center gap-2 md:mb-2 text-xs! md:text-sm! lg:text-base!">
-            <Link className="h-4 w-4" />
-            URL
-          </FieldLabel>
-          <Input
-            id="url"
-            type="text"
-            placeholder="Example : https://example.com"
-            className="text-[10px] md:text-xs lg:text-sm h-10 md:h-12 bg-transparent border-neutral-500"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-        </Field>
-        <Field className="flex-1">
-          <FieldLabel htmlFor="phone" className="flex items-center gap-2 md:mb-2 text-xs! md:text-sm! lg:text-base!">
-            <Phone className="h-4 w-4" />
+    <div className="flex flex-col items-center mb-5 md:gap-2 w-full">
+      {/* Report Type Selector */}
+      <div className="w-full mt-5 lg:mt-8 mb-1">
+        <p className="text-xs md:text-sm text-neutral-500 mb-3">What do you want to report?</p>
+        <div className="flex gap-3 md:gap-5 w-full">
+          {/* Suspicious Link/URL button */}
+          <button
+            type="button"
+            onClick={() => {
+              setReportType("url");
+              setValue("");
+            }}
+            className={`flex-1 relative flex items-center justify-center gap-2 py-3 px-4 rounded-lg border text-xs md:text-sm font-medium transition-all cursor-pointer ${
+              reportType === "url"
+                ? "border-red-500 text-red-600 bg-red-50 dark:bg-red-950/30"
+                : "border-neutral-400 text-neutral-500 hover:border-neutral-600"
+            }`}
+          >
+            <Link className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            Suspicious Link/URL
+            {reportType === "url" && <CheckSquare className="h-3.5 w-3.5 md:h-4 md:w-4 absolute right-2 top-2" />}
+          </button>
+
+          {/* Sender Phone Number button */}
+          <button
+            type="button"
+            onClick={() => {
+              setReportType("phone");
+              setValue("");
+            }}
+            className={`flex-1 relative flex items-center justify-center gap-2 py-3 px-4 rounded-lg border text-xs md:text-sm font-medium transition-all cursor-pointer ${
+              reportType === "phone"
+                ? "border-red-500 text-red-600 bg-red-50 dark:bg-red-950/30"
+                : "border-neutral-400 text-neutral-500 hover:border-neutral-600"
+            }`}
+          >
+            <Phone className="h-3.5 w-3.5 md:h-4 md:w-4" />
             Sender Phone Number
-          </FieldLabel>
-          <Input
-            id="phone"
-            type="text"
-            placeholder="Example : +62 812 3456 7890"
-            className="text-[10px] md:text-xs lg:text-sm h-10 md:h-12 bg-transparent border-neutral-500"
-            value={senderNumber}
-            onChange={(e) => setSenderNumber(e.target.value)}
-          />
-        </Field>
+            {reportType === "phone" && <CheckSquare className="h-3.5 w-3.5 md:h-4 md:w-4 absolute right-2 top-2" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Conditional input based on selected report type */}
+      <div className="w-full mb-5">
+        {reportType === "url" ? (
+          <Field>
+            <FieldLabel htmlFor="url" className="flex items-center gap-2 md:mb-2 text-xs! md:text-sm! lg:text-base!">
+              <Link className="h-4 w-4" />
+              URL
+            </FieldLabel>
+            <Input
+              id="url"
+              type="text"
+              placeholder="Example : https://example.com"
+              className="text-[10px] md:text-xs lg:text-sm h-10 md:h-12 bg-transparent border-neutral-500"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field>
+        ) : (
+          <Field>
+            <FieldLabel htmlFor="phone" className="flex items-center gap-2 md:mb-2 text-xs! md:text-sm! lg:text-base!">
+              <Phone className="h-4 w-4" />
+              Sender Phone Number
+            </FieldLabel>
+            <Input
+              id="phone"
+              type="text"
+              placeholder="Example : +62 812 3456 7890"
+              className="text-[10px] md:text-xs lg:text-sm h-10 md:h-12 bg-transparent border-neutral-500"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field>
+        )}
       </div>
 
       {/* Full Message Text */}
@@ -193,16 +240,13 @@ export default function CreateNewReport({ setIsSubmitted }: CreateNewReportProps
         </FieldGroup>
       </div>
 
-      {/* Error message */}
-      {error && <p className="w-full text-xs md:text-sm text-red-600 mb-3">{error}</p>}
-
       <div className="w-1/2">
         <Button
           className="w-full bg-red-900! hover:bg-red-800! text-white! py-5 lg:py-6 text-xs md:text-sm lg:text-lg font-semibold rounded-lg shadow-lg transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60"
           onClick={handleSubmit}
-          disabled={isLoading}
+          disabled={isSubmitting}
         >
-          {isLoading ? "Submitting..." : "Submit & Analyze"}
+          {isSubmitting ? "Submitting..." : "Submit & Analyze"}
         </Button>
       </div>
     </div>
