@@ -5,5 +5,4 @@ export const axiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // kirim cookie otomatis di setiap request
 });

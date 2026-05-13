@@ -56,7 +56,7 @@ export default function SubmitReport({ setIsSubmitted }: SubmitReportProps) {
             >
               Submit Another Report
             </Button>
-            <Link href="/report-status/TKT-CIMB-6664" className="flex-1 w-full">
+            <Link href="/signin" className="flex-1 w-full">
               <Button
                 variant="secondary"
                 className="w-full bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#166534] py-3 h-auto text-[10px] md:text-sm rounded-md md:rounded-xl transition-all active:scale-[0.98] border-none cursor-pointer shadow-sm"

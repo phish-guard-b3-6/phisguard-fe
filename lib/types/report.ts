@@ -42,8 +42,8 @@ export type ReportType = "url" | "phone";
 
 export interface CreateReportPayload {
   message: string;
-  value: string;         // URL jika type="url", nomor HP jika type="phone"
-  type: ReportType;      // menentukan isi dari field value
+  value: string; // URL jika type="url", nomor HP jika type="phone"
+  type: ReportType; // menentukan isi dari field value
   resource: ResourceOption;
   description: string;
   is_anonymous: boolean;
@@ -52,8 +52,12 @@ export interface CreateReportPayload {
 export interface ReportListItem {
   id: string;
   user_id: string;
+  message: string;
+  url: string;
   sender_number: string;
   resource: string;
+  description: string;
+  is_anonymous: boolean;
   is_blacklisted: boolean;
   created_at: string;
   updated_at: string;
@@ -69,3 +73,32 @@ export interface ReportListApiResponse {
   message: string;
   reports: ReportListGroup[];
 }
+
+export type RiskLevel = "Low Risk" | "Medium Risk" | "High Risk";
+
+export type ReportHandlingStatus = "Submitted" | "In Review" | "Confirmed" | "Closed";
+
+export type RiskConfig = {
+  borderColor: string;
+  badgeBorder: string;
+  badgeBg: string;
+  badgeShadow: string;
+  textColor: string;
+  dateBg: string;
+  dateText: string;
+  topBorder: string;
+  icon: string;
+  bgIcon: string;
+  bgOpacity: number;
+  label: string;
+  alertTitle: string;
+  alertBody: string;
+  btnBg: string;
+  btnHoverBg: string;
+  btnShadow: string;
+  border: string;
+  bg: string;
+  text: string;
+  shadow: string;
+  recommendations: string[];
+};

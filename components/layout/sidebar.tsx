@@ -38,10 +38,19 @@ export default function Sidebar({ role, setIsOpen, isLoggedIn, isMobile }: Sideb
 
   const navItems = role === "admin" ? adminItems : userItems;
 
-  const handleLogout = () => {
-    setUser(null);
-    setIsOpen(false);
-    router.push("/signin");
+  const handleLogout = async () => {
+    try {
+      // 1. Minta server menghapus httpOnly cookie
+      await fetch("/api/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Gagal melakukan logout di server", error);
+    } finally {
+      // 2. Bersihkan state client-side
+      setUser(null);
+      setIsOpen(false);
+      // 3. Arahkan ke halaman login
+      router.push("/signin");
+    }
   };
 
   return (
@@ -71,7 +80,9 @@ export default function Sidebar({ role, setIsOpen, isLoggedIn, isMobile }: Sideb
       <div className="flex-1 px-4 py-8 space-y-2 flex flex-col ">
         {isLoggedIn ? (
           navItems.map((item) => {
-            const isActive = pathname === item.href;
+            // Menu aktif jika pathname sama persis, ATAU jika pathname adalah sub-path dari menu tersebut
+            // (misal: /report-status/123 akan membuat menu /report-status aktif)
+            const isActive = pathname === item.href || (pathname.startsWith(item.href + "/") && item.href !== "/");
             return (
               <Link key={item.href} href={item.href} onClick={() => setIsOpen(false)}>
                 <div

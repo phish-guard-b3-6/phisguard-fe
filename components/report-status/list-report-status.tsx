@@ -4,115 +4,17 @@ import Image from "next/image";
 import { FileSearch, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FaWhatsapp, FaSms } from "react-icons/fa";
-import { CiGlobe } from "react-icons/ci";
-import { MdOutlineEmail } from "react-icons/md";
 import { GrLinkNext } from "react-icons/gr";
 import { ReportListItem } from "@/lib/types/report";
-
-// ─────────────────────────────────────────────
-// Type Definitions
-// ─────────────────────────────────────────────
-export type RiskLevel = "Low Risk" | "Medium Risk" | "High Risk";
-export type ReportHandlingStatus = "Submitted" | "In Review" | "Confirmed" | "Closed";
-
-// ─────────────────────────────────────────────
-// Configuration Helpers
-// ─────────────────────────────────────────────
-const riskConfig: Record<RiskLevel, { bg: string; text: string; border: string; dateBg: string; dateText: string; icon: string; shadow: string }> = {
-  "Low Risk": {
-    bg: "bg-green-50",
-    text: "text-green-600",
-    border: "border-green-300",
-    dateBg: "bg-green-400",
-    dateText: "text-white",
-    icon: "/icon/warning_green.svg",
-    shadow: "shadow-[inset_0_3px_10px_rgba(34,197,94,0.25)]",
-  },
-  "Medium Risk": {
-    bg: "bg-orange-50",
-    text: "text-orange-500",
-    border: "border-orange-300",
-    dateBg: "bg-orange-400",
-    dateText: "text-white",
-    icon: "/icon/warning_yellow.svg",
-    shadow: "shadow-[inset_0_3px_10px_rgba(249,115,22,0.25)]",
-  },
-  "High Risk": {
-    bg: "bg-red-50",
-    text: "text-red-600",
-    border: "border-red-300",
-    dateBg: "bg-red-400",
-    dateText: "text-white",
-    icon: "/icon/warning_red.svg",
-    shadow: "shadow-[inset_0_3px_10px_rgba(220,38,38,0.25)]",
-  },
-};
-
-const statusConfig: Record<ReportHandlingStatus, { label: string; bg: string; text: string }> = {
-  Submitted: {
-    label: "Submitted",
-    bg: "bg-gray-200",
-    text: "text-gray-600",
-  },
-  "In Review": {
-    label: "In Review",
-    bg: "bg-green-400",
-    text: "text-white",
-  },
-  Confirmed: {
-    label: "Confirmed",
-    bg: "bg-red-300",
-    text: "text-white",
-  },
-  Closed: {
-    label: "Closed",
-    bg: "bg-gray-200",
-    text: "text-gray-600",
-  },
-};
-
-const channelIcon: Record<string, React.ReactNode> = {
-  sms: <FaSms />,
-  whatsapp: <FaWhatsapp />,
-  email: <MdOutlineEmail />,
-  website: <CiGlobe />,
-};
-
-// ─────────────────────────────────────────────
-// Mapping helpers from API → display values
-// ─────────────────────────────────────────────
-function mapLabel(label: string): RiskLevel {
-  if (label === "high_risk") return "High Risk";
-  if (label === "medium_risk") return "Medium Risk";
-  return "Low Risk";
-}
-
-function mapStatus(status: string): ReportHandlingStatus {
-  if (status === "in_review") return "In Review";
-  if (status === "confirmed") return "Confirmed";
-  if (status === "closed") return "Closed";
-  return "Submitted";
-}
-
-function mapChannel(resource: string): string {
-  if (!resource) return "Unknown";
-  return resource.charAt(0).toUpperCase() + resource.slice(1);
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
+import { formatDate } from "@/lib/utils";
+import {
+  RISK_CONFIG,
+  STATUS_CONFIG,
+  CHANNEL_ICON,
+  mapLabel,
+  mapStatus,
+  mapChannel,
+} from "@/lib/constants/report";
 
 // ─────────────────────────────────────────────
 // Empty State Component
@@ -147,9 +49,9 @@ function ReportStatusCard({ report }: { report: ReportListItem }) {
   const riskLevel = mapLabel(report.detection.label);
   const status = mapStatus(report.ticket.status);
   const channelKey = report.resource.toLowerCase();
-  const risk = riskConfig[riskLevel];
-  const statusStyle = statusConfig[status];
-  const icon = channelIcon[channelKey] ?? <Clock className="w-4 h-4" />;
+  const risk = RISK_CONFIG[riskLevel];
+  const statusStyle = STATUS_CONFIG[status];
+  const icon = CHANNEL_ICON[channelKey] ?? <Clock className="w-4 h-4" />;
 
   return (
     <Card className="group px-4 md:px-10 rounded-lg md:rounded-2xl border border-gray-200 shadow-md bg-neutral-50 transition-all duration-200 overflow-hidden">
