@@ -9,14 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { CreateReportPayload, ResourceOption, ReportType } from "@/lib/types/report";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { axiosInstance } from "@/lib/axios";
 import { toast } from "sonner";
 
 interface CreateNewReportProps {
-  setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
+  onSubmitSuccess: (reportId: string) => void;
 }
 
-export default function CreateNewReport({ setIsSubmitted }: CreateNewReportProps) {
+export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProps) {
   // ── Form state ──────────────────────────────────────────────────────────────
   const [value, setValue] = useState(""); // isi URL atau nomor HP
   const [message, setMessage] = useState("");
@@ -29,25 +28,30 @@ export default function CreateNewReport({ setIsSubmitted }: CreateNewReportProps
 
   // Mutation tanstack ────────────────────────────────────────────────────────────────
   const { mutate: createReportMutation, isPending: isSubmitting } = useMutation({
-    mutationFn: (payload: CreateReportPayload) => axiosInstance.post("/reports", payload),
-    onSuccess: () => {
-      // Invalidasi cache agar data terbaru langsung di-fetch oleh ListReportStatusPage
+    mutationFn: async (payload: CreateReportPayload) => {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error?.message ?? "Terjadi kesalahan, coba lagi nanti.");
+      }
+
+      return res.json();
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["reports"] });
-      
       toast.success("Laporan berhasil dikirim!", {
         description: "Tim kami akan segera menindaklanjuti laporan Anda.",
       });
-      setIsSubmitted(true);
+      onSubmitSuccess(data?.reports?.id ?? "");
     },
     onError: (err: unknown) => {
-      // Mengambil pesan error detail dari response backend (BFF/External Backend)
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        "Terjadi kesalahan, coba lagi nanti.";
-      
-      toast.error("Gagal mengirim laporan", { 
-        description: message 
-      });
+      const message = (err as Error)?.message ?? "Terjadi kesalahan, coba lagi nanti.";
+      toast.error("Gagal mengirim laporan", { description: message });
     },
   });
 

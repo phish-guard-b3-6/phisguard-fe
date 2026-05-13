@@ -1,174 +1,33 @@
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { CheckCircle2, Ticket, BookOpen, Clock, ShieldAlert, AlertCircle, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Report } from "@/lib/types/report";
-
-// ── Ticket status → step index (0-based) ──────────────────────────────────────
-const STATUS_STEP_MAP: Record<string, number> = {
-  submitted: 0,
-  in_review: 1,
-  confirmed: 2,
-  closed: 3,
-};
-
-const HANDLING_STEPS = [
-  {
-    id: 1,
-    title: "Submitted",
-    description: "Report successfully received by the system.",
-  },
-  {
-    id: 2,
-    title: "In Review",
-    description: "The report is currently being analyzed by the team.",
-  },
-  {
-    id: 3,
-    title: "Confirmed",
-    description: "Verified as a confirmed phishing threat.",
-  },
-  {
-    id: 4,
-    title: "Closed",
-    description: "Case closed and mitigation actions completed.",
-  },
-];
-
-// ── Risk level helpers ────────────────────────────────────────────────────────
-type RiskConfig = {
-  borderColor: string;
-  badgeBorder: string;
-  badgeBg: string;
-  badgeShadow: string;
-  textColor: string;
-  dateBg: string;
-  topBorder: string;
-  icon: string;
-  label: string;
-  alertTitle: string;
-  alertBody: string;
-  btnBg: string;
-  btnHoverBg: string;
-  btnShadow: string;
-  bgIcon: string;
-  bgOpacity: number;
-  recommendations: string[];
-};
-
-function getRiskConfig(label: string): RiskConfig {
-  if (label === "high_risk") {
-    return {
-      borderColor: "border-l-red-600",
-      badgeBorder: "border-red-700",
-      badgeBg: "bg-white",
-      badgeShadow: "shadow-[inset_0_3px_10px_rgba(220,38,38,0.25)]",
-      textColor: "text-red-600",
-      dateBg: "bg-red-300",
-      topBorder: "border-t-red-600",
-      icon: "/icon/warning_red.svg",
-      bgIcon: "/icon/warning_red_bg.svg",
-      label: "High Risk",
-      alertTitle: "High-Level Security Alert",
-      alertBody: "Based on our system analysis, your report is highly likely to be a phishing attempt.",
-      btnBg: "bg-[#7a1b1b]!",
-      btnHoverBg: "hover:bg-[#631616]!",
-      btnShadow: "shadow-red-100",
-      bgOpacity: 0.15,
-      recommendations: [
-        "Never click on the provided link.",
-        "Never give your OTP, PIN, or password to anyone.",
-        "Block the sender's number on your device.",
-      ],
-    };
-  }
-  if (label === "medium_risk") {
-    return {
-      borderColor: "border-l-yellow-500",
-      badgeBorder: "border-yellow-600",
-      badgeBg: "bg-white",
-      badgeShadow: "shadow-[inset_0_3px_10px_rgba(234,179,8,0.25)]",
-      textColor: "text-yellow-600",
-      dateBg: "bg-yellow-200",
-      topBorder: "border-t-yellow-500",
-      icon: "/icon/warning_yellow.svg",
-      bgIcon: "/icon/warning_yellow_bg.svg",
-      label: "Medium Risk",
-      alertTitle: "Medium-Level Security Alert",
-      alertBody: "Based on our system analysis, your report has a moderate probability of being a phishing attempt.",
-      btnBg: "bg-yellow-600!",
-      btnHoverBg: "hover:bg-yellow-700!",
-      btnShadow: "shadow-yellow-100",
-      bgOpacity: 1,
-      recommendations: [
-        "Delay any interaction with this link or sender.",
-        "Verify the information through the official contacts of the relevant company.",
-        "Do not download or open any attached files.",
-      ],
-    };
-  }
-  // low_risk
-  return {
-    borderColor: "border-l-green-600",
-    badgeBorder: "border-green-700",
-    badgeBg: "bg-white",
-    badgeShadow: "shadow-[inset_0_3px_10px_rgba(22,163,74,0.25)]",
-    textColor: "text-green-600",
-    dateBg: "bg-green-200",
-    topBorder: "border-t-green-600",
-    icon: "/icon/warning_green.svg",
-    bgIcon: "/icon/warning_green_bg.svg",
-    label: "Low Risk",
-    alertTitle: "Low-Level Security Notice",
-    alertBody: "Based on our system analysis, your report has a low probability of being a phishing attempt. Stay cautious.",
-    btnBg: "bg-green-700!",
-    btnHoverBg: "hover:bg-green-800!",
-    btnShadow: "shadow-green-100",
-    bgOpacity: 1,
-    recommendations: [
-      "Stay vigilant if asked to provide personal identity data.",
-      "Ensure the URL always uses 'https://' and is not a fake website.",
-      "Report back if you notice any further strange activities or messages.",
-    ],
-  };
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
+import { formatDate } from "@/lib/utils";
+import {
+  RISK_CONFIG,
+  STATUS_STEP_MAP,
+  HANDLING_STEPS,
+  mapLabel,
+  mapStatus,
+} from "@/lib/constants/report";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface DetailReportStatusSectionProps {
-  report: Report | null;
+  report: Report;
 }
 
 export default function DetailReportStatusSection({ report }: DetailReportStatusSectionProps) {
-  if (!report) {
-    return (
-      <div className="w-full max-w-4xl mx-auto pt-10 pb-20 text-center text-gray-500">
-        <p className="text-lg font-semibold">Report not found.</p>
-        <p className="text-sm mt-2">Please check the Ticket ID and try again.</p>
-      </div>
-    );
-  }
-
-  const risk = getRiskConfig(report.detection.label);
+  const risk = RISK_CONFIG[mapLabel(report.detection.label)];
   const activeStepIndex = STATUS_STEP_MAP[report.ticket.status] ?? 0;
 
   const mlEngineResults = [
     "Domain closely resembles the official CIMB Niaga website (Typosquatting).",
-    report.is_blacklisted ? "Sender's number is listed in the internal Blacklist database." : "Sender's number is not currently in the blacklist.",
+    report.is_blacklisted
+      ? "Sender's number is listed in the internal Blacklist database."
+      : "Sender's number is not currently in the blacklist.",
     "Message contains urgency patterns commonly used by scammers.",
   ];
 
@@ -222,10 +81,13 @@ export default function DetailReportStatusSection({ report }: DetailReportStatus
           </ul>
 
           <Button
+            asChild
             className={`${risk.btnBg} ${risk.btnHoverBg} text-white p-4 md:p-6 text-sm md:text-sm lg:text-base rounded-xl shadow-md ${risk.btnShadow} transition-all active:scale-[0.98] border-none cursor-pointer`}
           >
-            <BookOpen className="w-5! h-5! mr-2" />
-            Learn About This Phishing Method
+            <Link href="/microlearning">
+              <BookOpen className="w-5! h-5! mr-2" />
+              Learn About This Phishing Method
+            </Link>
           </Button>
         </CardContent>
       </Card>
