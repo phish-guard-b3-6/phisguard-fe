@@ -3,17 +3,30 @@
 import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, ChevronRight, ChevronDown, HelpCircle, BookText } from "lucide-react";
+import { CheckCircle2, ChevronRight, ChevronDown, HelpCircle, BookText, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { Module, modules } from "./data";
+import { Module, ModuleItem, modules } from "./data";
+import { useLearningStore } from "@/stores/useLearningStore";
 
 // ─────────────────────────────────────────────
 // Sub-component: Module List Item
 // ─────────────────────────────────────────────
-function ModuleListItem({ module, isActive, isExpanded, onClick }: { module: Module; isActive: boolean; isExpanded?: boolean; onClick: () => void }) {
-  const isCompleted = module.progress === 100;
-  const progressColor = isCompleted ? "bg-green-500" : module.progress > 0 ? "bg-red-500" : "bg-gray-300";
+function ModuleListItem({
+  module,
+  progress,
+  isActive,
+  isExpanded,
+  onClick,
+}: {
+  module: Module;
+  progress: number;
+  isActive: boolean;
+  isExpanded?: boolean;
+  onClick: () => void;
+}) {
+  const isCompleted = progress === 100;
+  const progressColor = isCompleted ? "bg-green-500" : progress > 0 ? "bg-red-500" : "bg-gray-300";
 
   return (
     <div
@@ -35,9 +48,9 @@ function ModuleListItem({ module, isActive, isExpanded, onClick }: { module: Mod
 
       {/* Custom progress bar */}
       <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden mb-2">
-        <div className={`h-full rounded-full transition-all duration-500 ${progressColor}`} style={{ width: `${module.progress}%` }} />
+        <div className={`h-full rounded-full transition-all duration-500 ${progressColor}`} style={{ width: `${progress}%` }} />
       </div>
-      <p className="text-xs font-medium">{module.progress}% Completed</p>
+      <p className="text-xs font-medium">{progress}% Completed</p>
     </div>
   );
 }
@@ -46,6 +59,29 @@ function ModuleListItem({ module, isActive, isExpanded, onClick }: { module: Mod
 // Sub-component: Module Detail Panel
 // ─────────────────────────────────────────────
 function ModuleDetailPanel({ module }: { module: Module }) {
+  // Guard: only read localStorage-backed store after client has mounted
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const viewedMaterials = useLearningStore((s) => s.viewedMaterials);
+  const completedQuizzes = useLearningStore((s) => s.completedQuizzes);
+
+  const materialItem = module.items.find((i) => i.type === "material");
+  const materialViewed = isClient && materialItem ? viewedMaterials.has(materialItem.id) : false;
+
+  const getEffectiveStatus = (item: ModuleItem): "done" | "pending" | "locked" => {
+    if (!isClient) return item.type === "quiz" ? "locked" : "pending";
+    if (item.type === "material") {
+      return viewedMaterials.has(item.id) ? "done" : "pending";
+    }
+    // quiz
+    if (completedQuizzes.has(item.id)) return "done";
+    if (!materialViewed) return "locked";
+    return "pending";
+  };
+
   return (
     <Card className="rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm h-fit">
       <CardContent>
@@ -58,15 +94,19 @@ function ModuleDetailPanel({ module }: { module: Module }) {
         {/* Item List */}
         <div className="flex flex-col">
           {module.items.map((item, index) => {
+            const effectiveStatus = getEffectiveStatus(item);
             const targetHref = `/microlearning/${item.id}`;
 
             return (
               <Link
-                href={targetHref}
+                href={effectiveStatus === "locked" ? "#" : targetHref}
                 key={item.id}
-                className={`flex items-center justify-between gap-4 py-4 md:py-6 transition-all duration-150 cursor-pointer group ${
-                  index !== module.items.length - 1 ? "border-b border-red-300" : ""
-                }`}
+                onClick={(e) => {
+                  if (effectiveStatus === "locked") e.preventDefault();
+                }}
+                className={`flex items-center justify-between gap-4 py-4 md:py-6 transition-all duration-150 group ${
+                  effectiveStatus === "locked" ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                } ${index !== module.items.length - 1 ? "border-b border-red-300" : ""}`}
               >
                 <div className="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
                   {/* Icon */}
@@ -91,10 +131,16 @@ function ModuleDetailPanel({ module }: { module: Module }) {
                           {item.type === "material" ? "Learning Materials" : "Quiz"}
                         </span>
                       </div>
-                      {item.status === "done" && (
+                      {effectiveStatus === "done" && (
                         <span className="flex items-center gap-1.5 text-xs lg:text-sm text-green-600 font-bold">
                           <CheckCircle2 className="w-4 h-4" />
                           Done
+                        </span>
+                      )}
+                      {effectiveStatus === "locked" && (
+                        <span className="flex items-center gap-1.5 text-xs lg:text-sm text-gray-500 font-bold">
+                          <Lock className="w-4 h-4" />
+                          Locked
                         </span>
                       )}
                     </div>
@@ -121,6 +167,14 @@ function ModulesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const moduleParam = searchParams.get("module");
+  const { getModuleProgress } = useLearningStore();
+  // Guard against SSR — only read store values client-side
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const getProgress = (materialId: string, quizId: string) => (isClient ? getModuleProgress(materialId, quizId) : 0);
 
   const [activeModuleId, setActiveModuleId] = useState<string>(
     moduleParam && modules.some((m) => m.id === moduleParam) ? moduleParam : modules[0].id,
@@ -186,6 +240,10 @@ function ModulesPageContent() {
               <React.Fragment key={module.id}>
                 <ModuleListItem
                   module={module}
+                  progress={getProgress(
+                    module.items.find((i) => i.type === "material")?.id ?? "",
+                    module.items.find((i) => i.type === "quiz")?.id ?? "",
+                  )}
                   isActive={module.id === activeModuleId}
                   isExpanded={isExpanded}
                   onClick={() => handleModuleClick(module.id)}

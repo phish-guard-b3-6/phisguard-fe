@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { CreateReportPayload, ResourceOption, ReportType } from "@/lib/types/report";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 interface CreateNewReportProps {
@@ -24,7 +25,7 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [reportType, setReportType] = useState<ReportType>("url");
 
-  const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Mutation tanstack ────────────────────────────────────────────────────────────────
   const { mutate: createReportMutation, isPending: isSubmitting } = useMutation({
@@ -43,7 +44,7 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      router.refresh();
       toast.success("Laporan berhasil dikirim!", {
         description: "Tim kami akan segera menindaklanjuti laporan Anda.",
       });

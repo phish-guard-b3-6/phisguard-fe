@@ -1,67 +1,78 @@
 import React from "react";
-import Image from "next/image";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { Ticket, ShieldAlert, AlertTriangle } from "lucide-react";
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  icon: string; // icon filename prefix e.g. "new_report"
+  icon: string; // "report_status" | "new_report" | "blacklist"
   trend?: { value: string; direction: "up" | "down" };
   subtitle?: string;
-  accentColor?: "red" | "orange" | "yellow";
+  accentColor?: "green" | "red" | "orange" | "yellow";
 }
 
+const iconMap: Record<string, React.ComponentType<any>> = {
+  report_status: Ticket,
+  new_report: ShieldAlert,
+  blacklist: AlertTriangle,
+};
+
 const accentMap = {
+  green: {
+    iconBg: "bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30",
+    iconColor: "text-emerald-500 dark:text-emerald-400",
+    trendBg: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400",
+  },
   red: {
-    bg: "bg-red-50 dark:bg-red-950/40",
-    iconBg: "bg-red-100 dark:bg-red-900/50",
-    border: "border-red-100 dark:border-red-900/40",
-    trendUp: "text-green-600 bg-green-50 dark:bg-green-900/30",
-    trendDown: "text-red-500 bg-red-50 dark:bg-red-900/30",
+    iconBg: "bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/30",
+    iconColor: "text-red-500 dark:text-red-400",
+    trendBg: "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400",
   },
   orange: {
-    bg: "bg-orange-50 dark:bg-orange-950/40",
-    iconBg: "bg-orange-100 dark:bg-orange-900/50",
-    border: "border-orange-100 dark:border-orange-900/40",
-    trendUp: "text-green-600 bg-green-50 dark:bg-green-900/30",
-    trendDown: "text-red-500 bg-red-50 dark:bg-red-900/30",
+    iconBg: "bg-orange-50 dark:bg-orange-950/30 border border-orange-100 dark:border-orange-900/30",
+    iconColor: "text-orange-500 dark:text-orange-400",
+    trendBg: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400",
   },
   yellow: {
-    bg: "bg-yellow-50 dark:bg-yellow-950/40",
-    iconBg: "bg-yellow-100 dark:bg-yellow-900/50",
-    border: "border-yellow-100 dark:border-yellow-900/40",
-    trendUp: "text-green-600 bg-green-50 dark:bg-green-900/30",
-    trendDown: "text-red-500 bg-red-50 dark:bg-red-900/30",
+    iconBg: "bg-orange-50 dark:bg-orange-950/30 border border-orange-100 dark:border-orange-900/30",
+    iconColor: "text-orange-500 dark:text-orange-400",
+    trendBg: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400",
   },
 };
 
-export default function StatCard({ title, value, icon, trend, subtitle, accentColor = "red" }: StatCardProps) {
-  const accent = accentMap[accentColor];
+export default function StatCard({ 
+  title, 
+  value, 
+  icon, 
+  trend, 
+  subtitle, 
+  accentColor = "red" 
+}: StatCardProps) {
+  const accent = accentMap[accentColor] || accentMap.red;
+  const IconComponent = iconMap[icon] || Ticket;
 
   return (
-    <div className={`flex-1 rounded-xl border ${accent.border} ${accent.bg} px-5 py-4 flex items-center gap-4 shadow-sm`}>
-      {/* Icon */}
-      <div className={`h-12 w-12 rounded-full ${accent.iconBg} flex items-center justify-center shrink-0`}>
-        <Image src={`/icon/${icon}_dark.svg`} alt={title} width={24} height={24} />
+    <div className="flex-1 bg-white dark:bg-gray-900/60 border border-gray-200/60 dark:border-gray-800/80 rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+      {/* Icon Container */}
+      <div className={`h-16 w-16 rounded-2xl ${accent.iconBg} flex items-center justify-center shrink-0`}>
+        <IconComponent className={`h-8 w-8 ${accent.iconColor}`} />
       </div>
 
       {/* Content */}
-      <div className="flex flex-col gap-0.5">
-        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{title}</p>
-        <div className="flex items-end gap-2">
-          <span className="text-3xl font-extrabold text-gray-900 dark:text-white leading-none">{value}</span>
+      <div className="flex flex-col">
+        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">{title}</p>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{value}</span>
           {trend && (
-            <span
-              className={`flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-full mb-0.5 ${
-                trend.direction === "up" ? accent.trendUp : accent.trendDown
-              }`}
-            >
-              {trend.direction === "up" ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {trend.value}
+            <span className={`inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded ${accent.trendBg}`}>
+              {trend.direction === "up" ? "↗" : "↘"} {trend.value}
+            </span>
+          )}
+          {subtitle && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+              {subtitle}
             </span>
           )}
         </div>
-        {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>}
       </div>
     </div>
   );

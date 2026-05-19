@@ -15,16 +15,10 @@ export default function StatsSection({ data }: StatsSectionProps) {
         title="Total Reports (Active)"
         value={data.totalReports.value}
         icon="report_status"
-        accentColor="red"
+        accentColor="green"
         trend={data.totalReports.trend}
       />
-      <StatCard
-        title="High Risk Detected"
-        value={data.highRisk.value}
-        icon="new_report"
-        accentColor="orange"
-        trend={data.highRisk.trend}
-      />
+      <StatCard title="High Risk Detected" value={data.highRisk.value} icon="new_report" accentColor="red" trend={data.highRisk.trend} />
       <StatCard
         title="Pending Triage"
         value={data.pendingTriage.value}

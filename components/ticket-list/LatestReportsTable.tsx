@@ -1,13 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { AlertCircle, AlertTriangle, Eye } from "lucide-react";
 import { Report, TriageStatus } from "../dashboard/dummy-data";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import TicketDetailModal from "./TicketDetailModal";
+import { useFilterStore } from "@/stores/useFilterStore";
 
 const statusStyles: Record<TriageStatus, string> = {
   "In Review": "bg-green-400 text-white dark:bg-green-900/40 dark:text-green-400",
   Submitted: "bg-cyan-500 text-white dark:bg-cyan-900/40 dark:text-cyan-500",
   Closed: "bg-gray-300 text-white dark:bg-gray-800 dark:text-gray-300",
-  Confirmed: "bg-red-300 text-white dark:bg-red-900/40 dark:text-red-300",
 };
 
 function RiskBadge({ score }: { score: number }) {
@@ -25,72 +30,182 @@ function RiskBadge({ score }: { score: number }) {
 }
 
 interface LatestReportsTableProps {
-  reports: Report[];
   title?: string;
   hideLink?: boolean;
   isTicketListPage?: boolean;
   onDetailClick?: (report: Report) => void;
+  initialReports?: Report[]; // Data dari Server Component (SSR), skip useQuery jika ada
 }
 
 export default function LatestReportsTable({
-  reports,
-  title = "10 Latest Reports",
+  title = "Latest Reports",
   hideLink = false,
   isTicketListPage = false,
   onDetailClick,
+  initialReports,
 }: LatestReportsTableProps) {
+  const [cursor, setCursor] = useState<string>("");
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const { dayBefore } = useFilterStore();
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["adminReports", { day_before: dayBefore, cursor }],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/admin?day_before=${dayBefore}&limit=30&cursor=${cursor}`);
+      if (!res.ok) throw new Error("Gagal mengambil data laporan");
+      return res.json();
+    },
+    enabled: !initialReports, // Tidak fetch jika data sudah ada dari SSR
+  });
+
+  const rawReports = initialReports ?? data?.reports?.reports ?? [];
+  // Jika initialReports sudah berupa Report[], langsung pakai. Jika dari API, perlu mapping.
+  const reports: Report[] = initialReports
+    ? initialReports
+    : (rawReports as any[]).map((r: any) => {
+        let triageStatus: TriageStatus = "Submitted";
+        if (r.ticket?.status === "in_review") triageStatus = "In Review";
+        else if (r.ticket?.status === "closed") triageStatus = "Closed";
+
+        return {
+          id: r.id,
+          ticket_id: r.ticket?.id,
+          ticketId: r.ticket?.code || `TKT-${r.id.slice(0, 8).toUpperCase()}`,
+          reportTime: new Date(r.created_at).toLocaleDateString("id-ID", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          platform: r.resource ? (r.resource === "sms" ? "SMS" : r.resource.charAt(0).toUpperCase() + r.resource.slice(1)) : "Web",
+          riskScore: r.detection?.score || 0,
+          triageStatus: triageStatus,
+          reportedUrl: r.value,
+        };
+      });
+
+  const handleNextPage = () => {
+    const nextCursor = data?.reports?.next_cursor;
+    if (nextCursor) {
+      setCursorHistory((prev) => [...prev, cursor]);
+      setCursor(nextCursor);
+    }
+  };
+
+  const handlePrevPage = () => {
+    const previousCursor = cursorHistory[cursorHistory.length - 1];
+    if (previousCursor !== undefined) {
+      setCursorHistory((prev) => prev.slice(0, -1));
+      setCursor(previousCursor);
+    }
+  };
+
+  const handleDetailClick = async (report: Report) => {
+    if (report.ticket_id && report.id) {
+      try {
+        const res = await fetch(`/api/tickets?id=${report.ticket_id}&report_id=${report.id}`);
+        if (!res.ok) throw new Error("Gagal mengambil data detail tiket");
+        const detailData = await res.json();
+        console.log("Detail data:", detailData);
+      } catch (error) {
+        console.error("Error fetching ticket detail:", error);
+      }
+    }
+
+    if (onDetailClick) {
+      onDetailClick(report);
+    } else {
+      setSelectedReport(report);
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-900/60 border border-red-300 dark:border-red-900/40 rounded-2xl shadow-sm p-5">
-      {/* Table header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
-        {!hideLink && (
-          <Link href="/ticket-list" className="text-xs text-black hover:text-red-600 font-medium transition-colors">
-            View All Tickets →
-          </Link>
+    <>
+      <div className="bg-white dark:bg-gray-900/60 border border-red-300 dark:border-red-900/40 rounded-2xl shadow-sm p-5">
+        {/* Table header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            {isTicketListPage ? `All Ticket Reports (${reports.length})` : title}
+          </h2>
+          {!hideLink && (
+            <Link href="/ticket-list" className="text-xs text-black hover:text-red-600 font-medium transition-colors">
+              View All Tickets →
+            </Link>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="text-center py-10 font-medium text-gray-500">Loading tickets...</div>
+        ) : isError ? (
+          <div className="text-center py-10 text-red-500">Gagal memuat data tiket.</div>
+        ) : (
+          /* Table */
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-red-300 dark:border-red-900/40">
+                  {["Ticket ID", "Report Time", "Platform", "Risk Score", "Status"].map((h) => (
+                    <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold dark:text-gray-500 uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
+                  {isTicketListPage && (
+                    <th className="text-left py-2.5 px-3 text-xs font-semibold dark:text-gray-500 uppercase tracking-wide">Action</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-300 dark:divide-red-900/40">
+                {reports.map((r) => (
+                  <tr key={r.ticketId} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                    <td className="py-3  font-mono text-xs text-gray-700 dark:text-gray-300 font-medium">{r.ticketId}</td>
+                    <td className="py-3  text-gray-500 dark:text-gray-400 text-xs">{r.reportTime}</td>
+                    <td className="py-3 px-3 text-gray-700 dark:text-gray-300">{r.platform}</td>
+                    <td className="py-3 px-3">
+                      <RiskBadge score={r.riskScore} />
+                    </td>
+                    <td className="py-3">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusStyles[r.triageStatus]}`}>
+                        {r.triageStatus}
+                      </span>
+                    </td>
+                    {isTicketListPage && (
+                      <td className="py-3 px-3">
+                        <Button
+                          onClick={() => handleDetailClick(r)}
+                          disabled={r.triageStatus === "Closed"}
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 disabled:opacity-45 disabled:text-gray-450 dark:disabled:text-gray-600"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Triage
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-red-300 dark:border-red-900/40">
-              {["Ticket ID", "Report Time", "Platform", "Risk Score", "Status"].map((h) => (
-                <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold dark:text-gray-500 uppercase tracking-wide">
-                  {h}
-                </th>
-              ))}
-              {isTicketListPage && <th className="text-left py-2.5 px-3 text-xs font-semibold dark:text-gray-500 uppercase tracking-wide">Action</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-red-300 dark:divide-red-900/40">
-            {reports.map((r) => (
-              <tr key={r.ticketId} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                <td className="py-3  font-mono text-xs text-gray-700 dark:text-gray-300 font-medium">{r.ticketId}</td>
-                <td className="py-3  text-gray-500 dark:text-gray-400 text-xs">{r.reportTime}</td>
-                <td className="py-3 px-3 text-gray-700 dark:text-gray-300">{r.platform}</td>
-                <td className="py-3 px-3">
-                  <RiskBadge score={r.riskScore} />
-                </td>
-                <td className="py-3">
-                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusStyles[r.triageStatus]}`}>
-                    {r.triageStatus}
-                  </span>
-                </td>
-                {isTicketListPage && (
-                  <td className="py-3 px-3">
-                    <Button onClick={() => onDetailClick?.(r)} variant="ghost" size="sm" className="h-8 gap-1.5 hover:bg-red-50 font-semibold">
-                      <Eye className="h-4 w-4" />
-                      Detail
-                    </Button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {/* Pagination Controls */}
+      {isTicketListPage && (
+        <div className="flex justify-between items-center mt-6 bg-white dark:bg-gray-900/60 border border-red-300 dark:border-red-900/40 rounded-2xl p-4 shadow-sm">
+          <Button onClick={handlePrevPage} disabled={cursor === ""} variant="outline" size="sm" className="text-xs font-semibold">
+            ← Previous
+          </Button>
+          <span className="text-xs text-gray-500 font-medium">Page {cursorHistory.length + 1}</span>
+          <Button onClick={handleNextPage} disabled={!data?.reports?.next_cursor} variant="outline" size="sm" className="text-xs font-semibold">
+            Next →
+          </Button>
+        </div>
+      )}
+
+      <TicketDetailModal isOpen={selectedReport !== null} onClose={() => setSelectedReport(null)} report={selectedReport} />
+    </>
   );
 }

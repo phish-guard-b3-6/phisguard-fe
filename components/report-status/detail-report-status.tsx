@@ -6,28 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Report } from "@/lib/types/report";
 import { formatDate } from "@/lib/utils";
-import {
-  RISK_CONFIG,
-  STATUS_STEP_MAP,
-  HANDLING_STEPS,
-  mapLabel,
-  mapStatus,
-} from "@/lib/constants/report";
+import { RISK_CONFIG, STATUS_STEP_MAP, HANDLING_STEPS, mapLabel, mapStatus } from "@/lib/constants/report";
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-interface DetailReportStatusSectionProps {
-  report: Report;
-}
-
-export default function DetailReportStatusSection({ report }: DetailReportStatusSectionProps) {
+export default function DetailReportStatusSection({ report }: { report: Report }) {
   const risk = RISK_CONFIG[mapLabel(report.detection.label)];
   const activeStepIndex = STATUS_STEP_MAP[report.ticket.status] ?? 0;
 
   const mlEngineResults = [
     "Domain closely resembles the official CIMB Niaga website (Typosquatting).",
-    report.is_blacklisted
-      ? "Sender's number is listed in the internal Blacklist database."
-      : "Sender's number is not currently in the blacklist.",
+    report.is_blacklisted ? "Sender's number is listed in the internal Blacklist database." : "Sender's number is not currently in the blacklist.",
     "Message contains urgency patterns commonly used by scammers.",
   ];
 

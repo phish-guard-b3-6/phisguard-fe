@@ -1,19 +1,25 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, BookText, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ModuleItem, modules } from "./data";
+import { useLearningStore } from "@/stores/useLearningStore";
 
 export default function MaterialPageSection({ item }: { item: ModuleItem }) {
   // Mencari modul indeks yang menaungi item ini agar Go back mengarah kembali kepadanya
   const parentModule = modules.find((m) => m.items.some((i) => i.id === item.id));
   const goBackHref = parentModule ? `/microlearning?module=${parentModule.id}` : "/microlearning";
-
-  // Mencari kuis yang ada di dalam modul ini
   const quizItem = parentModule?.items.find((i) => i.type === "quiz");
+
+  const markMaterialViewed = useLearningStore((s) => s.markMaterialViewed);
+
+  // Mark this material as viewed as soon as the page loads
+  useEffect(() => {
+    markMaterialViewed(item.id);
+  }, [item.id, markMaterialViewed]);
 
   return (
     <div className="w-full max-w-4xl mx-auto md:px-6 py-10">
