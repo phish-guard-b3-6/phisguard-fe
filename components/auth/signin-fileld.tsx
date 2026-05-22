@@ -41,7 +41,11 @@ export default function SigninField() {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData?.message ?? "Login gagal.");
+        let errorMessage = errorData?.message ?? "Login gagal.";
+        if (typeof errorMessage === "object" && errorMessage !== null) {
+          errorMessage = Object.values(errorMessage).join(", ");
+        }
+        throw new Error(String(errorMessage));
       }
 
       return res.json();
@@ -63,8 +67,11 @@ export default function SigninField() {
       }
     },
     onError: (err: unknown) => {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Email atau password salah.";
-      toast.error("Login gagal", { description: message });
+      let message = err instanceof Error ? err.message : "Email atau password salah.";
+      if (typeof message === "object" && message !== null) {
+        message = Object.values(message).join(", ");
+      }
+      toast.error("Login gagal", { description: String(message) });
     },
   });
 
