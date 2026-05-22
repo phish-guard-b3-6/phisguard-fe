@@ -47,8 +47,11 @@ export default function SignupField() {
     onError: (err: unknown) => {
       // Axios membungkus response backend di dalam err.response.data
       // Tanpa ini, kita hanya mendapat pesan generic "Request failed with status code 400"
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Terjadi kesalahan, coba lagi nanti.";
-      toast.error("Gagal membuat akun", { description: message });
+      let message = (err as any)?.response?.data?.message ?? "Terjadi kesalahan, coba lagi nanti.";
+      if (typeof message === "object" && message !== null) {
+        message = Object.values(message).join(", ");
+      }
+      toast.error("Gagal membuat akun", { description: String(message) });
     },
   });
 
