@@ -25,8 +25,7 @@ export const RISK_CONFIG: Record<RiskLevel, RiskConfig> = {
     // Pesan (digunakan di detail)
     label: "Low Risk",
     alertTitle: "Low-Level Security Notice",
-    alertBody:
-      "Based on our system analysis, your report has a low probability of being a phishing attempt. Stay cautious.",
+    alertBody: "Based on our system analysis, your report has a low probability of being a phishing attempt. Stay cautious.",
     recommendations: [
       "Stay vigilant if asked to provide personal identity data.",
       "Ensure the URL always uses 'https://' and is not a fake website.",
@@ -56,8 +55,7 @@ export const RISK_CONFIG: Record<RiskLevel, RiskConfig> = {
     btnShadow: "shadow-yellow-100",
     label: "Medium Risk",
     alertTitle: "Medium-Level Security Alert",
-    alertBody:
-      "Based on our system analysis, your report has a moderate probability of being a phishing attempt.",
+    alertBody: "Based on our system analysis, your report has a moderate probability of being a phishing attempt.",
     recommendations: [
       "Delay any interaction with this link or sender.",
       "Verify the information through the official contacts of the relevant company.",
@@ -86,8 +84,7 @@ export const RISK_CONFIG: Record<RiskLevel, RiskConfig> = {
     bgOpacity: 0.15,
     label: "High Risk",
     alertTitle: "High-Level Security Alert",
-    alertBody:
-      "Based on our system analysis, your report is highly likely to be a phishing attempt.",
+    alertBody: "Based on our system analysis, your report is highly likely to be a phishing attempt.",
     recommendations: [
       "Never click on the provided link.",
       "Never give your OTP, PIN, or password to anyone.",
@@ -111,7 +108,6 @@ export const RISK_CONFIG: Record<RiskLevel, RiskConfig> = {
 export const STATUS_CONFIG: Record<ReportHandlingStatus, { label: string; bg: string; text: string }> = {
   Submitted: { label: "Submitted", bg: "bg-gray-200", text: "text-gray-600" },
   "In Review": { label: "In Review", bg: "bg-green-400", text: "text-white" },
-  Confirmed: { label: "Confirmed", bg: "bg-red-300", text: "text-white" },
   Closed: { label: "Closed", bg: "bg-gray-200", text: "text-gray-600" },
 };
 
@@ -122,15 +118,13 @@ export const STATUS_CONFIG: Record<ReportHandlingStatus, { label: string; bg: st
 export const STATUS_STEP_MAP: Record<string, number> = {
   submitted: 0,
   in_review: 1,
-  confirmed: 2,
-  closed: 3,
+  closed: 2,
 };
 
 export const HANDLING_STEPS = [
   { id: 1, title: "Submitted", description: "Report successfully received by the system." },
   { id: 2, title: "In Review", description: "The report is currently being analyzed by the team." },
-  { id: 3, title: "Confirmed", description: "Verified as a confirmed phishing threat." },
-  { id: 4, title: "Closed", description: "Case closed and mitigation actions completed." },
+  { id: 3, title: "Closed", description: "Case closed and mitigation actions completed." },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,7 +153,6 @@ export function mapLabel(label: string): RiskLevel {
 /** Memetakan status tiket API ke ReportHandlingStatus display. */
 export function mapStatus(status: string): ReportHandlingStatus {
   if (status === "in_review") return "In Review";
-  if (status === "confirmed") return "Confirmed";
   if (status === "closed") return "Closed";
   return "Submitted";
 }

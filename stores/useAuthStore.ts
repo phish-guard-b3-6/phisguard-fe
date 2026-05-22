@@ -14,6 +14,7 @@ interface UserProfile {
 interface AuthState {
   user: UserProfile | null;
   isAuthenticated: boolean;
+  isHydrating: boolean; // true saat pertama kali fetch /me belum selesai
   setUser: (user: UserProfile | null) => void;
   fetchCurrentUser: () => Promise<UserProfile | null>;
 }
@@ -21,6 +22,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
+  isHydrating: true, // mulai true, jadi false setelah fetch pertama selesai
 
   setUser: (user) =>
     set({
@@ -33,15 +35,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await fetch("/api/me", { credentials: "include" });
       if (!res.ok) {
-        set({ user: null, isAuthenticated: false });
+        set({ user: null, isAuthenticated: false, isHydrating: false });
         return null;
       }
       const data = await res.json();
       const user: UserProfile = data.users;
-      set({ user, isAuthenticated: true });
+      set({ user, isAuthenticated: true, isHydrating: false });
       return user;
     } catch {
-      set({ user: null, isAuthenticated: false });
+      set({ user: null, isAuthenticated: false, isHydrating: false });
       return null;
     }
   },
