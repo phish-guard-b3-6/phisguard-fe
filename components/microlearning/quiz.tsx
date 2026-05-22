@@ -6,7 +6,8 @@ import { ArrowLeft, CheckCircle2, CheckSquare, HelpCircle, Info, Square, XCircle
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ModuleItem, modules } from "./data";
-import { useLearningStore } from "@/stores/useLearningStore";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useModuleProgress } from "@/hooks/useModuleProgress";
 
 export default function QuizPageSection({ item }: { item: ModuleItem }) {
   const parentModule = modules.find((m) => m.items.some((i) => i.id === item.id));
@@ -14,19 +15,46 @@ export default function QuizPageSection({ item }: { item: ModuleItem }) {
 
   const questions = item.quizContent?.questions || [];
 
+  const queryClient = useQueryClient();
+
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-
-  const markQuizCompleted = useLearningStore((s) => s.markQuizCompleted);
 
   const handleOptionSelect = (qId: string, option: string) => {
     if (submitted) return;
     setAnswers((prev) => ({ ...prev, [qId]: option }));
   };
 
+  // Mengambil data progress modul dari cache global untuk mendapatkan ID progress sebelum melakukan submit quiz.
+  const { data: progressData } = useModuleProgress();
+
+  const moduleProgress = progressData?.module_progresses?.find(
+    (p) => p.module_id === parentModule?.id,
+  );
+
+  // PATCH /module-progress/:id untuk menandai quiz selesai.
+  const { mutate: submitQuizProgress, isPending: isSubmitting } = useMutation({
+    mutationFn: async () => {
+      if (!moduleProgress?.id) throw new Error("Module progress ID tidak ditemukan");
+      const res = await fetch(`/api/module-progress/${moduleProgress.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed_items: 2, status: "completed" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message ?? "Gagal menyimpan hasil quiz");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moduleProgress"] });
+    },
+    onError: (err) => console.error("Gagal submit quiz:", err),
+  });
+
   const handleSubmit = () => {
-    // Calculate score
     let correct = 0;
     questions.forEach((q) => {
       const selectedOption = answers[q.id];
@@ -37,9 +65,9 @@ export default function QuizPageSection({ item }: { item: ModuleItem }) {
     setScore(correct);
     setSubmitted(true);
 
-    // Mark as completed if ≥2 correct
+    // Panggil PATCH hanya jika lulus (≥2 benar)
     if (correct >= 2) {
-      markQuizCompleted(item.id);
+      submitQuizProgress();
     }
   };
 
@@ -233,10 +261,10 @@ export default function QuizPageSection({ item }: { item: ModuleItem }) {
               {!submitted ? (
                 <Button
                   onClick={handleSubmit}
-                  disabled={!allAnswered}
+                  disabled={!allAnswered || isSubmitting}
                   className="w-full bg-[#4ade80] hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-6 rounded-lg cursor-pointer"
                 >
-                  Submit Quiz
+                  {isSubmitting ? "Menyimpan..." : "Submit Quiz"}
                 </Button>
               ) : passed ? (
                 <Link href={goBackHref} className="block w-full">

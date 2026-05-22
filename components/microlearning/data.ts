@@ -32,7 +32,7 @@ export interface Module {
 
 export const modules: Module[] = [
   {
-    id: "mod-1",
+    id: "00000000-0000-0000-0000-000000000001",
     title: "Pengenalan Phishing",
     description: "Penipuan pencurian data melalui pesan WhatsApp, Email, dan SMS.",
     progress: 0,
@@ -86,7 +86,7 @@ export const modules: Module[] = [
     ],
   },
   {
-    id: "mod-2",
+    id: "eb7b10ce-9a30-436c-b3ad-7a95586b03cc",
     title: "Modus Phishing Terkini",
     description: "Waspada modus file APK palsu dan manipulasi alamat website.",
     progress: 0,
@@ -140,7 +140,7 @@ export const modules: Module[] = [
     ],
   },
   {
-    id: "mod-3",
+    id: "6dc0e55d-1c66-4ed8-99ca-494175687ae7",
     title: "Cara Mencegah Phishing",
     description: "Teliti format dokumen asli dan selalu cek alamat URL.",
     progress: 0,
@@ -186,7 +186,7 @@ export const modules: Module[] = [
     ],
   },
   {
-    id: "mod-4",
+    id: "7a11d57d-940e-4ba9-b5dc-a3ad68c86692",
     title: "Langkah Awal Menghadapi Phishing",
     description: "Jangan panik, abaikan tautan, dan segera lapor ke PhishGuard.",
     progress: 0,
@@ -244,7 +244,7 @@ export const modules: Module[] = [
     ],
   },
   {
-    id: "mod-5",
+    id: "fdd5b68e-aa15-467a-b7e7-a02adc70e052",
     title: "Tindakan Darurat dan Edukasi Keamanan",
     description: "Matikan internet, hubungi 14041, lalu bagikan edukasi ke sekitar.",
     progress: 0,

@@ -47,6 +47,7 @@ export interface CreateReportPayload {
   resource: ResourceOption;
   description: string;
   is_anonymous: boolean;
+  screenshot?: File | null; // opsional, gambar bukti dari user
 }
 
 export interface ReportListItem {

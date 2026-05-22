@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ChevronRight, ChevronDown, HelpCircle, BookText, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useModuleProgress, ModuleProgressItem } from "@/hooks/useModuleProgress";
 
 import { Module, ModuleItem, modules } from "./data";
-import { useLearningStore } from "@/stores/useLearningStore";
 
 // ─────────────────────────────────────────────
 // Sub-component: Module List Item
@@ -39,14 +39,13 @@ function ModuleListItem({
         <p className="text-sm font-semibold text-gray-800 leading-snug">{module.title}</p>
         <div className="flex items-center gap-2 shrink-0">
           {isCompleted && <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5" />}
-          {/* Chevron indicator — only visible below lg */}
           <ChevronDown
             className={`w-4 h-4 text-red-400 mt-0.5 transition-transform duration-300 lg:hidden ${isExpanded ? "rotate-180" : "rotate-0"}`}
           />
         </div>
       </div>
 
-      {/* Custom progress bar */}
+      {/* Progress bar — nilai dari API (completed_percentage) */}
       <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden mb-2">
         <div className={`h-full rounded-full transition-all duration-500 ${progressColor}`} style={{ width: `${progress}%` }} />
       </div>
@@ -58,40 +57,40 @@ function ModuleListItem({
 // ─────────────────────────────────────────────
 // Sub-component: Module Detail Panel
 // ─────────────────────────────────────────────
-function ModuleDetailPanel({ module }: { module: Module }) {
-  // Guard: only read localStorage-backed store after client has mounted
+function ModuleDetailPanel({ module, moduleProgress }: { module: Module; moduleProgress: number }) {
+  // Hydration guard: useState lokal digunakan karena belum ada API per-item status.
+  // isClient dibutuhkan agar status item tidak berbeda antara SSR dan client.
   const [isClient, setIsClient] = useState(false);
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const viewedMaterials = useLearningStore((s) => s.viewedMaterials);
-  const completedQuizzes = useLearningStore((s) => s.completedQuizzes);
-
-  const materialItem = module.items.find((i) => i.type === "material");
-  const materialViewed = isClient && materialItem ? viewedMaterials.has(materialItem.id) : false;
-
+  /**
+   * Menentukan status tampilan setiap baris item berdasarkan completed_percentage dari API:
+   * - material: "done" jika progress > 0 (artinya sudah dikunjungi), selain itu "pending"
+   * - quiz: "done" jika progress = 100 (lulus), "locked" jika material belum selesai, selain itu "pending"
+   */
   const getEffectiveStatus = (item: ModuleItem): "done" | "pending" | "locked" => {
     if (!isClient) return item.type === "quiz" ? "locked" : "pending";
+
     if (item.type === "material") {
-      return viewedMaterials.has(item.id) ? "done" : "pending";
+      return moduleProgress > 0 ? "done" : "pending";
     }
-    // quiz
-    if (completedQuizzes.has(item.id)) return "done";
-    if (!materialViewed) return "locked";
+
+    // Quiz: done jika sudah 100%, locked jika material belum dikerjakan (progress masih 0)
+    if (moduleProgress === 100) return "done";
+    if (moduleProgress === 0) return "locked";
     return "pending";
   };
 
   return (
     <Card className="rounded-xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm h-fit">
       <CardContent>
-        {/* Header */}
         <div className="pb-4 border-b border-red-300 text-left">
           <h2 className="hidden lg:text-2xl font-extrabold mb-1 tracking-tight">{module.title}</h2>
           <p className="text-sm lg:text-base font-light leading-relaxed">{module.description}</p>
         </div>
 
-        {/* Item List */}
         <div className="flex flex-col">
           {module.items.map((item, index) => {
             const effectiveStatus = getEffectiveStatus(item);
@@ -109,7 +108,6 @@ function ModuleDetailPanel({ module }: { module: Module }) {
                 } ${index !== module.items.length - 1 ? "border-b border-red-300" : ""}`}
               >
                 <div className="flex items-center gap-4 md:gap-5 min-w-0 flex-1">
-                  {/* Icon */}
                   <div
                     className={`shrink-0 flex items-center justify-center w-8 h-8 md:w-12 md:h-12 rounded-full shadow-sm ${
                       item.type === "material" ? "bg-green-100/80" : "bg-red-100/80"
@@ -122,10 +120,9 @@ function ModuleDetailPanel({ module }: { module: Module }) {
                     )}
                   </div>
 
-                  {/* Title & Meta */}
-                  <div className="space-y-2 md:space-y-3 min-w-0 flex-1 ">
+                  <div className="space-y-2 md:space-y-3 min-w-0 flex-1">
                     <p className="text-sm lg:text-xl font-bold text-gray-900 transition-colors line-clamp-2">{item.title}</p>
-                    <div className="flex justify-between ">
+                    <div className="flex justify-between">
                       <div className="flex items-center gap-2 md:gap-6">
                         <span className="text-xs lg:text-sm rounded-sm w-fit font-medium">
                           {item.type === "material" ? "Learning Materials" : "Quiz"}
@@ -147,7 +144,6 @@ function ModuleDetailPanel({ module }: { module: Module }) {
                   </div>
                 </div>
 
-                {/* Arrow in Circle */}
                 <div className="shrink-0 w-8 h-8 md:w-10 md:h-10 border border-gray-200 rounded-full flex items-center justify-center bg-gray-50/50 transition-all group-hover:bg-gray-100">
                   <ChevronRight className="w-4 h-4 md:w-5 md:h-5 text-gray-400 group-hover:text-gray-600" />
                 </div>
@@ -167,33 +163,41 @@ function ModulesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const moduleParam = searchParams.get("module");
-  const { getModuleProgress } = useLearningStore();
-  // Guard against SSR — only read store values client-side
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
-  const getProgress = (materialId: string, quizId: string) => (isClient ? getModuleProgress(materialId, quizId) : 0);
+  // Mengambil data progress seluruh modul untuk menghitung dan menampilkan progress bar masing-masing modul.
+  const { data: progressData } = useModuleProgress();
+
+  // Ubah array → Map untuk lookup O(1) berdasarkan module_id (UUID).
+  // module_id pada respons API harus cocok dengan field id di data.ts.
+  const progressMap = React.useMemo(() => {
+    const map = new Map<string, number>();
+    (progressData?.module_progresses ?? []).forEach((p) => {
+      map.set(p.module_id, p.completed_percentage);
+    });
+    return map;
+  }, [progressData]);
+
+  const getProgress = (moduleId: string) => progressMap.get(moduleId) ?? 0;
 
   const [activeModuleId, setActiveModuleId] = useState<string>(
+    // Dukung deep-link (?module=<uuid>) saat render pertama; fallback ke modul pertama.
     moduleParam && modules.some((m) => m.id === moduleParam) ? moduleParam : modules[0].id,
   );
-  // Separate state for mobile accordion — persisted in sessionStorage so
-  // navigating back from a detail page restores the previously opened panel.
+
+  // sessionStorage menyimpan panel accordion yang terbuka agar tetap ada saat navigasi (misal: tombol Back).
   const [mobileExpandedId, setMobileExpandedId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return sessionStorage.getItem("mobileExpandedId") ?? null;
   });
 
-  // Sync state with URL parameter changes (e.g., when Back button is pressed)
+  // Sinkronkan activeModuleId saat parameter URL ?module berubah dari luar.
   useEffect(() => {
     if (moduleParam && modules.some((m) => m.id === moduleParam)) {
       setActiveModuleId(moduleParam);
     }
   }, [moduleParam]);
 
-  // Persist mobileExpandedId to sessionStorage whenever it changes
+  // Cerminkan mobileExpandedId ke sessionStorage agar tetap ada saat navigasi soft.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (mobileExpandedId !== null) {
@@ -206,11 +210,9 @@ function ModulesPageContent() {
   const handleModuleClick = (id: string) => {
     setActiveModuleId(id);
 
-    // Toggle mobile panel only on screens smaller than 'lg' (1024px)
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setMobileExpandedId((prev) => (prev === id ? null : id));
     } else {
-      // Reset mobile state when clicking on desktop to avoid unintended behavior if resized later
       setMobileExpandedId(null);
     }
 
@@ -231,7 +233,7 @@ function ModulesPageContent() {
 
       {/* Two-Column Layout */}
       <div className="flex lg:gap-16 items-start">
-        {/* Left: Module List */}
+        {/* Left: Module List — progress dari API */}
         <div className="flex-3 w-full lg:w-72 shrink-0 space-y-3">
           <h2 className="text-base font-bold text-gray-700 mb-4">Module List</h2>
           {modules.map((module) => {
@@ -240,22 +242,18 @@ function ModulesPageContent() {
               <React.Fragment key={module.id}>
                 <ModuleListItem
                   module={module}
-                  progress={getProgress(
-                    module.items.find((i) => i.type === "material")?.id ?? "",
-                    module.items.find((i) => i.type === "quiz")?.id ?? "",
-                  )}
+                  progress={getProgress(module.id)}
                   isActive={module.id === activeModuleId}
                   isExpanded={isExpanded}
                   onClick={() => handleModuleClick(module.id)}
                 />
-                {/* Inline detail panel — slide-down, visible only below lg */}
+                {/* Inline detail panel — slide-down, hanya terlihat di bawah lg */}
                 <div
                   className={`lg:hidden grid transition-all duration-300 ease-in-out ${
                     isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   }`}
                 >
                   <div className="overflow-hidden">
-                    {/* Connector: vertical line from item to panel */}
                     <div className="flex gap-3 pt-1">
                       <div className="flex flex-col items-center">
                         <div className="w-0.5 h-3 bg-red-300" />
@@ -263,7 +261,7 @@ function ModulesPageContent() {
                         <div className="w-0.5 flex-1 bg-red-300" />
                       </div>
                       <div className="flex-1 pb-1">
-                        <ModuleDetailPanel module={activeModule} />
+                        <ModuleDetailPanel module={activeModule} moduleProgress={getProgress(activeModule.id)} />
                       </div>
                     </div>
                   </div>
@@ -275,7 +273,7 @@ function ModulesPageContent() {
 
         {/* Right: Module Detail */}
         <div className="hidden lg:flex flex-5">
-          <ModuleDetailPanel module={activeModule} />
+          <ModuleDetailPanel module={activeModule} moduleProgress={getProgress(activeModule.id)} />
         </div>
       </div>
     </div>
