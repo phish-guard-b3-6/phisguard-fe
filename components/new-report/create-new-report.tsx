@@ -3,12 +3,13 @@
 import React, { useState } from "react";
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Info, Link, MessageSquareMore, Phone, CheckSquare } from "lucide-react";
+import { Info, Link, MessageSquareMore, Phone, CheckSquare, Image as ImageIcon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { CreateReportPayload, ResourceOption, ReportType } from "@/lib/types/report";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 interface CreateNewReportProps {
@@ -23,16 +24,47 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
   const [description, setDescription] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [reportType, setReportType] = useState<ReportType>("url");
+  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const queryClient = useQueryClient();
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setScreenshot(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setScreenshot(e.dataTransfer.files[0]);
+    }
+  };
+
+  const router = useRouter();
 
   // Mutation tanstack ────────────────────────────────────────────────────────────────
   const { mutate: createReportMutation, isPending: isSubmitting } = useMutation({
     mutationFn: async (payload: CreateReportPayload) => {
-      const res = await fetch("/api/reports", {
+      // Bangun FormData agar screenshot (file) bisa dikirim bersama field lainnya
+      const formData = new FormData();
+      formData.append("message", payload.message);
+      formData.append("value", payload.value);
+      formData.append("type", payload.type);
+      formData.append("resource", payload.resource);
+      formData.append("description", payload.description);
+      formData.append("is_anonymous", String(payload.is_anonymous));
+      if (payload.screenshot) {
+        formData.append("screenshot", payload.screenshot);
+      }
+
+      // Jangan set Content-Type manual — browser/fetch akan otomatis set multipart boundary
+      const res = await fetch("/api/reports/admin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -43,7 +75,7 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      router.refresh();
       toast.success("Laporan berhasil dikirim!", {
         description: "Tim kami akan segera menindaklanjuti laporan Anda.",
       });
@@ -69,6 +101,7 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
       resource,
       description,
       is_anonymous: isAnonymous,
+      screenshot, // file gambar bukti (opsional)
     });
   }
 
@@ -172,6 +205,72 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
           </Field>
         </FieldGroup>
       </FieldSet>
+
+      {/* Screenshot Evidence (Optional) */}
+      <div className="w-full mb-5">
+        <div className="flex items-center gap-2 mb-2">
+          <ImageIcon className="h-4.5 w-4.5 text-neutral-800 dark:text-neutral-200" />
+          <span className="text-xs md:text-sm lg:text-base font-medium text-gray-900 dark:text-gray-100">
+            Screenshot Evidence (Optional)
+          </span>
+        </div>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="image/png, image/jpeg, image/gif"
+          className="hidden"
+        />
+
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          className="border border-dashed border-neutral-400 dark:border-neutral-700 rounded-lg p-6 bg-neutral-50/50 dark:bg-gray-900/50 hover:bg-neutral-100/50 dark:hover:bg-gray-800/50 transition-all flex flex-col items-center justify-center cursor-pointer min-h-[100px]"
+        >
+          {screenshot ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative w-full max-w-[200px] h-[120px] rounded-md overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-black/20">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={URL.createObjectURL(screenshot)}
+                  alt="Screenshot preview"
+                  className="object-contain w-full h-full"
+                />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs md:text-sm font-medium text-neutral-700 dark:text-neutral-300 break-all text-center max-w-[280px] md:max-w-md">
+                  {screenshot.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setScreenshot(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="text-xs text-red-650 hover:text-red-500 underline font-medium cursor-pointer"
+                >
+                  Remove image
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs md:text-sm text-neutral-600 dark:text-neutral-400 text-center">
+                <span className="text-red-800 dark:text-red-400 font-semibold cursor-pointer mr-1">
+                  Upload image
+                </span>
+                or drag and drop
+              </p>
+              <p className="text-[10px] md:text-xs text-neutral-400 mt-1 text-center">
+                PNG, JPG, GIF up to 10MB
+              </p>
+            </>
+          )}
+        </div>
+      </div>
 
       <p className="text-base lg:text-lg self-start mb-3">Context Details</p>
 

@@ -10,10 +10,11 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Sidebar from "./sidebar";
+import NotificationDropdown from "./NotificationDropdown";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 export default function Navbar() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrating } = useAuthStore();
   const role = user?.role ?? "user";
 
   const { theme, setTheme } = useTheme();
@@ -57,7 +58,7 @@ export default function Navbar() {
       {/* Search and bell Icon when < 768 / mobile  */}
       <div className={`${isSearchOpen && isMobile ? "hidden" : "flex"} md:hidden gap-4`}>
         <Search className="h-5 w-5 cursor-pointer" onClick={() => setIsSearchOpen(true)} />
-        <Bell className="h-5 w-5" />
+        <NotificationDropdown className="h-5 w-5" />
       </div>
 
       {/* Search bar when > 768 */}
@@ -69,12 +70,15 @@ export default function Navbar() {
           autoFocus={isSearchOpen}
         />
         <Separator orientation="vertical" className="hidden md:flex bg-gray-400 " />
-        <Bell className="hidden md:block" />
+        <NotificationDropdown className="hidden md:block" />
         {isSearchOpen && isMobile && <X className="h-6 w-6 text-gray-600 cursor-pointer" onClick={() => setIsSearchOpen(false)} />}
       </div>
 
       {/* Profile or Signin/Signup Button when > 768 */}
-      {isAuthenticated ? (
+      {isHydrating ? (
+        // Tampilkan skeleton bulat selama fetch /me belum selesai — hindari flash Sign In
+        <div className="hidden md:flex h-9 w-9 rounded-full bg-gray-200 animate-pulse" />
+      ) : isAuthenticated ? (
         <Link href="/profile" className="hidden md:flex items-center justify-center hover:opacity-80 transition-opacity">
           <div className="h-9 w-9 bg-red-600 rounded-full flex items-center justify-center border border-red-700 shadow-sm transition-transform hover:scale-105">
             <span className="text-sm font-bold text-white">

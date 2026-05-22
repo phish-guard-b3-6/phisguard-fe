@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     httpOnly: true, // tidak bisa dibaca JS
     secure: process.env.NODE_ENV === "production", // hanya HTTPS di production
     sameSite: "lax", // proteksi CSRF
-    maxAge: 60 * 60 * 24 * 7, // 7 hari
+    maxAge: 60 * 60 * 2, // 2 jam
     path: "/",
   });
 

@@ -2,7 +2,7 @@ export interface ReportTicket {
   id: string;
   report_id: string;
   code: string;
-  status: "submitted" | "in_review" | "confirmed" | "closed";
+  status: "submitted" | "in_review" | "closed";
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +47,7 @@ export interface CreateReportPayload {
   resource: ResourceOption;
   description: string;
   is_anonymous: boolean;
+  screenshot?: File | null; // opsional, gambar bukti dari user
 }
 
 export interface ReportListItem {
@@ -76,7 +77,7 @@ export interface ReportListApiResponse {
 
 export type RiskLevel = "Low Risk" | "Medium Risk" | "High Risk";
 
-export type ReportHandlingStatus = "Submitted" | "In Review" | "Confirmed" | "Closed";
+export type ReportHandlingStatus = "Submitted" | "In Review" | "Closed";
 
 export type RiskConfig = {
   borderColor: string;

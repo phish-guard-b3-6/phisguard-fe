@@ -1,72 +1,208 @@
 "use client";
 
+import { useState } from "react";
 import { Trash2, Link2, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BlacklistItem, BlacklistType } from "../dashboard/dummy-data";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import DeleteConfirmModal from "./DeleteConfirmModal";
 
 const TypeIcon = ({ type }: { type: BlacklistType }) => {
   if (type === "Phone Number") return <Phone className="h-4 w-4 text-gray-500 shrink-0" />;
   return <Link2 className="h-4 w-4 text-gray-500 shrink-0" />;
 };
 
-interface BlacklistTableProps {
-  data: BlacklistItem[];
-  onDeleteClick: (item: BlacklistItem) => void;
+/** Membaca body respons secara aman. Tidak akan throw meskipun body kosong atau bukan JSON. */
+async function safeParseResponse(res: Response): Promise<Record<string, any>> {
+  try {
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {};
+  }
 }
 
-export default function BlacklistTable({ data, onDeleteClick }: BlacklistTableProps) {
-  return (
-    <div className="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden py-5">
-      <div className="overflow-x-auto px-4">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-red-300 dark:border-red-900/40 dark:bg-white/5">
-              {["Type", "Value", "Reason", "Added by", "Date", "Action"].map((h) => (
-                <th key={h} className="text-left py-3 px-4 text-xs font-bold dark:text-gray-400 uppercase tracking-wide">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-red-200 dark:divide-red-900/30">
-            {data.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                {/* Type with icon */}
-                <td className="py-3 px-4">
-                  <span className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium text-sm">
-                    <TypeIcon type={item.type} />
-                    {item.type}
-                  </span>
-                </td>
+/** Melempar Error dengan pesan detail dari respons API ketika statusnya tidak ok. */
+async function throwApiError(res: Response, fallback: string): Promise<never> {
+  const body = await safeParseResponse(res);
+  const message = body.message || body.error || `HTTP Error ${res.status}`;
+  throw new Error(`${fallback} (${message})`);
+}
 
-                {/* Value */}
-                <td className="py-3 px-4 dark:text-gray-100 text-sm">{item.value}</td>
+export default function BlacklistTable() {
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<BlacklistItem | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-                {/* Reason */}
-                <td className="py-3 px-4 dark:text-gray-300 text-sm">{item.reason}</td>
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["blacklists"],
+    queryFn: async () => {
+      const res = await fetch("/api/blacklists");
+      if (!res.ok) await throwApiError(res, "Gagal mengambil data blacklist");
+      return res.json();
+    },
+  });
 
-                {/* Added By */}
-                <td className="py-3 px-4 dark:text-gray-400 text-sm">{item.addedBy}</td>
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/blacklists/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await safeParseResponse(res);
+        return { success: false, message: body.message || body.error || `HTTP Error ${res.status} (Internal Server Error)` };
+      }
+      await safeParseResponse(res);
+      return { success: true };
+    },
+    // async (id: string): Promise<{ success: boolean; message?: string }> => {
+    //   try {
+    //     const res = await fetch(`/api/blacklists/${id}`, { method: "DELETE" });
+    //     if (!res.ok) {
+    //       const body = await safeParseResponse(res);
+    //       return { success: false, message: body.message || body.error || `HTTP Error ${res.status} (Internal Server Error)` };
+    //     }
+    //     await safeParseResponse(res);
+    //     return { success: true };
+    //   } catch (err: any) {
+    //     return { success: false, message: err.message || "Network Error" };
+    //   }
+    // },
+    onSuccess: async (result) => {
+      // 1. Apapun respons dari API (meskipun 500 error dari backend),
+      // kita paksakan refresh data tabel terlebih dahulu untuk mencari kebenaran.
+      await queryClient.invalidateQueries({ queryKey: ["blacklists"] });
 
-                {/* Date */}
-                <td className="py-3 px-4 dark:text-gray-400 text-sm">{item.date}</td>
+      // 2. Ambil snapshot data tabel yang terbaru setelah refresh
+      const fresh = queryClient.getQueryData<{ blacklists: any[] }>(["blacklists"]);
 
-                {/* Action — delete only */}
-                <td className="py-3 px-4">
-                  <Button
-                    onClick={() => onDeleteClick(item)}
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      // 3. Cek apakah item yang barusan kita hapus MASIH ADA di tabel?
+      const stillExists = fresh?.blacklists?.some((b) => b.id === selectedItem?.id);
+
+      if (!stillExists) {
+        // ✅ KASUS SUKSES: Datanya sudah benar-benar hilang dari database!
+        // Abaikan error 500 palsu dari backend, langsung tutup modal.
+        setIsDeleteModalOpen(false);
+        setSelectedItem(null);
+        setDeleteError(null);
+      } else {
+        // ❌ KASUS GAGAL: Datanya masih ada. Ini berarti benar-benar gagal dihapus.
+        setDeleteError(result.message || "Gagal menghapus data blacklist");
+      }
+    },
+    onError: () => {
+      // Fallback jika terjadi network crash yang parah
+      setDeleteError("Terjadi kesalahan jaringan saat menghapus data.");
+    },
+  });
+
+  const handleDeleteClick = (item: BlacklistItem) => {
+    setSelectedItem(item);
+    setDeleteError(null);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (selectedItem?.id) {
+      deleteMutation.mutate(selectedItem.id);
+    }
+  };
+
+  const blacklists: BlacklistItem[] = (data?.blacklists ?? []).map((item: any) => ({
+    id: item.id,
+    type: item.type === "phone" ? "Phone Number" : ("URL" as BlacklistType),
+    value: item.value,
+    reason: item.reason || "-",
+    addedBy: item.added_by || "System",
+    date: new Date(item.created_at).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+  }));
+
+  if (isLoading) {
+    return (
+      <div className="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-10 text-center text-sm font-medium text-gray-500">
+        Loading blacklist...
       </div>
-    </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-white dark:bg-gray-900/60 border border-red-200 dark:border-red-900/40 rounded-2xl shadow-sm p-10 flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="font-bold text-base text-gray-900 dark:text-gray-100">Gagal Memuat Data Blacklist</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Terjadi kesalahan saat menghubungi server backend.</p>
+        </div>
+        <div className="text-xs bg-red-50 dark:bg-red-950/40 px-4 py-2.5 rounded-xl border border-red-100 dark:border-red-900/40 text-red-600 dark:text-red-400 max-w-md font-mono text-left overflow-x-auto w-full">
+          <span className="font-semibold">Detail Error: </span>
+          {error instanceof Error ? error.message : JSON.stringify(error)}
+        </div>
+        <button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["blacklists"] })}
+          className="mt-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm shadow-red-600/20"
+        >
+          Coba Ulang
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden py-5">
+        <div className="overflow-x-auto px-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-red-300 dark:border-red-900/40 dark:bg-white/5">
+                {["Type", "Value", "Reason", "Added by", "Date", "Action"].map((h) => (
+                  <th key={h} className="text-left py-3 px-4 text-xs font-bold dark:text-gray-400 uppercase tracking-wide">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-red-200 dark:divide-red-900/30">
+              {blacklists.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  <td className="py-3 px-4">
+                    <span className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium text-sm">
+                      <TypeIcon type={item.type} />
+                      {item.type}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 dark:text-gray-100 text-sm">{item.value}</td>
+                  <td className="py-3 px-4 dark:text-gray-300 text-sm">{item.reason}</td>
+                  <td className="py-3 px-4 dark:text-gray-400 text-sm">{item.addedBy}</td>
+                  <td className="py-3 px-4 dark:text-gray-400 text-sm">{item.date}</td>
+                  <td className="py-3 px-4">
+                    <Button
+                      onClick={() => handleDeleteClick(item)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeleteError(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        isLoading={deleteMutation.isPending}
+        errorMessage={deleteError}
+      />
+    </>
   );
 }
