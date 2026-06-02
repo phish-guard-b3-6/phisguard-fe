@@ -125,7 +125,10 @@ export default function Navbar() {
 
         {/* Dropdown hasil pencarian */}
         {showDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+          <div 
+            className="absolute top-full left-0 right-0 mt-2 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden"
+            onMouseDown={(e) => e.preventDefault()}
+          >
             {isSearching ? (
               /* Loading state */
               <div className="flex items-center gap-3 px-5 py-4 text-sm text-gray-500">
