@@ -11,6 +11,7 @@ interface PageProps {
 }
 
 async function getReport(id: string): Promise<ReportUser | null> {
+  console.log("cekkkkk=============",id)
   try {
     const res = await serverApi.get<ReportApiResponse>(`/reports/${id}`);
     if (res.data.reports) {
