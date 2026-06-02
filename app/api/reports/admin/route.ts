@@ -13,6 +13,41 @@ export async function POST(req: NextRequest) {
     // Terima FormData dari client (mendukung upload file screenshot)
     const formData = await req.formData();
 
+    // ── Verifikasi reCAPTCHA v3 (hanya untuk user yang belum login) ──────────
+    // User yang sudah login dianggap sudah terverifikasi melalui proses autentikasi,
+    // sehingga tidak perlu dikenakan CAPTCHA lagi untuk mengurangi friction.
+    const isAuthenticated = !!token;
+
+    if (!isAuthenticated) {
+      const captchaToken = formData.get("captcha_token") as string | null;
+
+      if (!captchaToken) {
+        return NextResponse.json({ message: "Token CAPTCHA tidak ditemukan." }, { status: 400 });
+      }
+
+      const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+      const verifyRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `secret=${secretKey}&response=${captchaToken}`,
+      });
+
+      const recaptchaData = await verifyRes.json();
+
+      // Tolak jika gagal verifikasi atau skor bot terlalu tinggi (< 0.5 = kemungkinan bot)
+      if (!recaptchaData.success || recaptchaData.score < 0.5) {
+        console.warn("reCAPTCHA gagal:", recaptchaData);
+        return NextResponse.json(
+          { message: "Permintaan ditolak karena terdeteksi sebagai bot." },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Hapus captcha_token sebelum diteruskan ke backend eksternal (aman meskipun tidak ada)
+    formData.delete("captcha_token");
+    // ─────────────────────────────────────────────────────────────────────────
+
     const backendRes = await fetch(`${process.env.API_URL}/reports`, {
       method: "POST",
       headers,
@@ -32,6 +67,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
   }
 }
+
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("auth_token")?.value;

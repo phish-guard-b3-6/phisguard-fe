@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import QueryProvider from "@/providers/query-providers";
+import { ReCaptchaProvider } from "next-recaptcha-v3";
 
 // ── Goli Font (local) ──────────────────────────────────────────────────────
 // Font files located at app/fonts/
@@ -57,7 +58,11 @@ export default function RootLayout({
         )}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <ReCaptchaProvider reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_KEY!}>
+              {children}
+            </ReCaptchaProvider>
+          </QueryProvider>
           <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>

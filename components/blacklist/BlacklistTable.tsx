@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { Trash2, Link2, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BlacklistItem, BlacklistType } from "../dashboard/dummy-data";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import { BlacklistItem, BlacklistType } from "@/lib/types/report";
 
 const TypeIcon = ({ type }: { type: BlacklistType }) => {
-  if (type === "Phone Number") return <Phone className="h-4 w-4 text-gray-500 shrink-0" />;
+  if (type === "phone") return <Phone className="h-4 w-4 text-gray-500 shrink-0" />;
   return <Link2 className="h-4 w-4 text-gray-500 shrink-0" />;
 };
 
@@ -33,12 +33,16 @@ export default function BlacklistTable() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<BlacklistItem | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string>("");
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
+  const blacklistQueryKey = ["blacklists", { cursor }] as const;
+
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["blacklists"],
+    queryKey: blacklistQueryKey,
     queryFn: async () => {
-      const res = await fetch("/api/blacklists");
+      const res = await fetch(`/api/blacklists?limit=10&cursor=${cursor}`);
       if (!res.ok) await throwApiError(res, "Gagal mengambil data blacklist");
       return res.json();
     },
@@ -54,38 +58,13 @@ export default function BlacklistTable() {
       await safeParseResponse(res);
       return { success: true };
     },
-    // async (id: string): Promise<{ success: boolean; message?: string }> => {
-    //   try {
-    //     const res = await fetch(`/api/blacklists/${id}`, { method: "DELETE" });
-    //     if (!res.ok) {
-    //       const body = await safeParseResponse(res);
-    //       return { success: false, message: body.message || body.error || `HTTP Error ${res.status} (Internal Server Error)` };
-    //     }
-    //     await safeParseResponse(res);
-    //     return { success: true };
-    //   } catch (err: any) {
-    //     return { success: false, message: err.message || "Network Error" };
-    //   }
-    // },
     onSuccess: async (result) => {
-      // 1. Apapun respons dari API (meskipun 500 error dari backend),
-      // kita paksakan refresh data tabel terlebih dahulu untuk mencari kebenaran.
-      await queryClient.invalidateQueries({ queryKey: ["blacklists"] });
-
-      // 2. Ambil snapshot data tabel yang terbaru setelah refresh
-      const fresh = queryClient.getQueryData<{ blacklists: any[] }>(["blacklists"]);
-
-      // 3. Cek apakah item yang barusan kita hapus MASIH ADA di tabel?
-      const stillExists = fresh?.blacklists?.some((b) => b.id === selectedItem?.id);
-
-      if (!stillExists) {
-        // ✅ KASUS SUKSES: Datanya sudah benar-benar hilang dari database!
-        // Abaikan error 500 palsu dari backend, langsung tutup modal.
+      await queryClient.invalidateQueries({ queryKey: blacklistQueryKey });
+      if (result.success) {
         setIsDeleteModalOpen(false);
         setSelectedItem(null);
         setDeleteError(null);
       } else {
-        // ❌ KASUS GAGAL: Datanya masih ada. Ini berarti benar-benar gagal dihapus.
         setDeleteError(result.message || "Gagal menghapus data blacklist");
       }
     },
@@ -107,9 +86,24 @@ export default function BlacklistTable() {
     }
   };
 
-  const blacklists: BlacklistItem[] = (data?.blacklists ?? []).map((item: any) => ({
+  const handleNextPage = () => {
+    const nextCursor = data?.blacklists?.next_cursor;
+    if (nextCursor) {
+      setCursorHistory((prev) => [...prev, cursor]);
+      setCursor(nextCursor);
+    }
+  };
+
+  const handlePrevPage = () => {
+    const prev = [...cursorHistory];
+    const prevCursor = prev.pop() ?? "";
+    setCursorHistory(prev);
+    setCursor(prevCursor);
+  };
+
+  const blacklists: BlacklistItem[] = (Array.isArray(data?.blacklists?.blacklists) ? data.blacklists.blacklists : []).map((item: any) => ({
     id: item.id,
-    type: item.type === "phone" ? "Phone Number" : ("URL" as BlacklistType),
+    type: item.type === "phone" ? "phone" : "url",
     value: item.value,
     reason: item.reason || "-",
     addedBy: item.added_by || "System",
@@ -140,7 +134,7 @@ export default function BlacklistTable() {
           {error instanceof Error ? error.message : JSON.stringify(error)}
         </div>
         <button
-          onClick={() => queryClient.invalidateQueries({ queryKey: ["blacklists"] })}
+          onClick={() => queryClient.invalidateQueries({ queryKey: blacklistQueryKey })}
           className="mt-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm shadow-red-600/20"
         >
           Coba Ulang
@@ -169,7 +163,7 @@ export default function BlacklistTable() {
                   <td className="py-3 px-4">
                     <span className="flex items-center gap-2 text-gray-700 dark:text-gray-200 font-medium text-sm">
                       <TypeIcon type={item.type} />
-                      {item.type}
+                      {item.type === "url" ? "URL" : "Phone Number"}
                     </span>
                   </td>
                   <td className="py-3 px-4 dark:text-gray-100 text-sm">{item.value}</td>
@@ -191,6 +185,29 @@ export default function BlacklistTable() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-6 bg-white dark:bg-gray-900/60 border border-red-300 dark:border-red-900/40 rounded-2xl p-4 shadow-sm">
+        <Button
+          onClick={handlePrevPage}
+          disabled={cursorHistory.length === 0}
+          variant="outline"
+          size="sm"
+          className="text-xs font-semibold"
+        >
+          ← Previous
+        </Button>
+        <span className="text-xs text-gray-500 font-medium">Page {cursorHistory.length + 1}</span>
+        <Button
+          onClick={handleNextPage}
+          disabled={!data?.blacklists?.next_cursor}
+          variant="outline"
+          size="sm"
+          className="text-xs font-semibold"
+        >
+          Next →
+        </Button>
       </div>
 
       <DeleteConfirmModal
