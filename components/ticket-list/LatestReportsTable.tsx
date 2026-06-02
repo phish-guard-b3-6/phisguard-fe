@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { AlertCircle, AlertTriangle, Eye } from "lucide-react";
-import { Report, TriageStatus } from "../dashboard/dummy-data";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import TicketDetailModal from "./TicketDetailModal";
 import { useFilterStore } from "@/stores/useFilterStore";
+import { ReportAdmin, TriageStatus } from "@/lib/types/report";
 
 const statusStyles: Record<TriageStatus, string> = {
   "In Review": "bg-green-400 text-white dark:bg-green-900/40 dark:text-green-400",
@@ -33,8 +33,8 @@ interface LatestReportsTableProps {
   title?: string;
   hideLink?: boolean;
   isTicketListPage?: boolean;
-  onDetailClick?: (report: Report) => void;
-  initialReports?: Report[]; // Data dari Server Component (SSR), skip useQuery jika ada
+  onDetailClick?: (report: ReportAdmin) => void;
+  initialReports?: ReportAdmin[]; // Data dari Server Component (SSR), skip useQuery jika ada
 }
 
 export default function LatestReportsTable({
@@ -46,11 +46,47 @@ export default function LatestReportsTable({
 }: LatestReportsTableProps) {
   const [cursor, setCursor] = useState<string>("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportAdmin | null>(null);
+  const queryClient = useQueryClient();
   const { dayBefore } = useFilterStore();
 
+  // Query key didefinisikan sekali — dipakai bersama oleh useQuery dan useMutation
+  const adminReportsQueryKey = ["adminReports", { day_before: dayBefore, cursor }] as const;
+
+  // Mutation untuk update status ticket → in_review
+  const { mutate: patchInReview } = useMutation({
+    mutationFn: (ticketId: string) =>
+      fetch(`/api/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "in_review" }),
+      }).then((res) => {
+        if (!res.ok) throw new Error("Gagal mengupdate status");
+      }),
+    onSuccess: (_, ticketId) => {
+      // Mutasi cache langsung setelah PATCH berhasil
+      queryClient.setQueryData(adminReportsQueryKey, (old: any) => {
+        if (!old?.reports?.reports) return old;
+        return {
+          ...old,
+          reports: {
+            ...old.reports,
+            reports: old.reports.reports.map((r: any) =>
+              r.ticket?.id === ticketId
+                ? { ...r, ticket: { ...r.ticket, status: "in_review" } }
+                : r
+            ),
+          },
+        };
+      });
+    },
+    onError: (err) => {
+      console.error("Error patching status:", err);
+    },
+  });
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["adminReports", { day_before: dayBefore, cursor }],
+    queryKey: adminReportsQueryKey,
     queryFn: async () => {
       const res = await fetch(`/api/reports/admin?day_before=${dayBefore}&limit=30&cursor=${cursor}`);
       if (!res.ok) throw new Error("Gagal mengambil data laporan");
@@ -60,8 +96,8 @@ export default function LatestReportsTable({
   });
 
   const rawReports = initialReports ?? data?.reports?.reports ?? [];
-  // Jika initialReports sudah berupa Report[], langsung pakai. Jika dari API, perlu mapping.
-  const reports: Report[] = initialReports
+  // Jika initialReports sudah berupa ReportAdmin[], langsung pakai. Jika dari API, perlu mapping.
+  const reports: ReportAdmin[] = initialReports
     ? initialReports
     : (rawReports as any[]).map((r: any) => {
         let triageStatus: TriageStatus = "Submitted";
@@ -71,6 +107,7 @@ export default function LatestReportsTable({
         return {
           id: r.id,
           ticket_id: r.ticket?.id,
+          ticketCode: r.ticket?.code,
           ticketId: r.ticket?.code || `TKT-${r.id.slice(0, 8).toUpperCase()}`,
           reportTime: new Date(r.created_at).toLocaleDateString("id-ID", {
             month: "short",
@@ -81,9 +118,11 @@ export default function LatestReportsTable({
           }),
           platform: r.resource ? (r.resource === "sms" ? "SMS" : r.resource.charAt(0).toUpperCase() + r.resource.slice(1)) : "Web",
           riskScore: r.detection?.score || 0,
-          triageStatus: triageStatus,
-          reportedUrl: r.value,
-        };
+          triageStatus,
+          reportedValue: r.value,
+          triage_status: r.triage_status === "confirmed" || r.triage_status === "false_positive" ? r.triage_status : null,
+          type: typeof r.value === "string" && r.value.startsWith("http") ? "url" : "phone",
+        } as ReportAdmin;
       });
 
   const handleNextPage = () => {
@@ -102,15 +141,24 @@ export default function LatestReportsTable({
     }
   };
 
-  const handleDetailClick = async (report: Report) => {
+  const handleDetailClick = async (report: ReportAdmin) => {
     if (report.ticket_id && report.id) {
-      try {
-        const res = await fetch(`/api/tickets?id=${report.ticket_id}&report_id=${report.id}`);
-        if (!res.ok) throw new Error("Gagal mengambil data detail tiket");
-        const detailData = await res.json();
-        console.log("Detail data:", detailData);
-      } catch (error) {
-        console.error("Error fetching ticket detail:", error);
+      // Jalankan GET detail dan PATCH status secara paralel — keduanya independen
+      const [detailResult] = await Promise.allSettled([
+        fetch(`/api/tickets?id=${report.ticket_id}&report_id=${report.id}`).then((res) => {
+          if (!res.ok) throw new Error("Gagal mengambil data detail tiket");
+          return res.json();
+        }),
+        // PATCH hanya jika status belum In Review
+        report.triageStatus !== "In Review" && report.ticket_id
+          ? patchInReview(report.ticket_id)
+          : Promise.resolve(),
+      ]);
+
+      if (detailResult.status === "fulfilled") {
+        console.log("Detail data:", detailResult.value);
+      } else {
+        console.error("Error fetching ticket detail:", detailResult.reason);
       }
     }
 

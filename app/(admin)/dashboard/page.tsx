@@ -3,7 +3,7 @@ import StatsSection from "@/components/dashboard/StatsSection";
 import ChartsSection from "@/components/dashboard/ChartsSection";
 import LatestReportsTable from "@/components/ticket-list/LatestReportsTable";
 import { serverApi } from "@/lib/server-api";
-import { Report, TriageStatus } from "@/components/dashboard/dummy-data";
+import { ReportAdmin, TriageStatus } from "@/lib/types/report";
 
 export const metadata = {
   title: "Security Dashboard | CIMB PhishGuard",
@@ -19,7 +19,7 @@ async function getDashboardData() {
   }
 }
 
-function mapReports(rawReports: any[]): Report[] {
+function mapReports(rawReports: any[]): ReportAdmin[] {
   return rawReports.map((r) => {
     let triageStatus: TriageStatus = "Submitted";
     if (r.ticket?.status === "in_review") triageStatus = "In Review";
@@ -39,8 +39,11 @@ function mapReports(rawReports: any[]): Report[] {
       platform: r.resource ? (r.resource === "sms" ? "SMS" : r.resource.charAt(0).toUpperCase() + r.resource.slice(1)) : "Web",
       riskScore: r.detection?.score || 0,
       triageStatus,
-      reportedUrl: r.value,
-    };
+      reportedValue: r.value,
+      type: r.resource === "sms" || r.resource === "whatsapp" ? "phone" : "url",
+      ticketCode: r.ticket?.code,
+      triage_status: r.triage_status === "confirmed" || r.triage_status === "false_positive" ? r.triage_status : null,
+    } as ReportAdmin;
   });
 }
 
@@ -60,7 +63,7 @@ export default async function DashboardPage() {
     },
   };
 
-  const initialReports: Report[] = mapReports(dashboardData?.reports ?? []);
+  const initialReports: ReportAdmin[] = mapReports(dashboardData?.reports ?? []);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-8">

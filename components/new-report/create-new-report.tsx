@@ -19,6 +19,7 @@ import { CreateReportPayload, ResourceOption, ReportType } from "@/lib/types/rep
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useReCaptcha } from "next-recaptcha-v3";
 
 interface CreateNewReportProps {
   onSubmitSuccess: (reportId: string) => void;
@@ -35,6 +36,8 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const { executeRecaptcha } = useReCaptcha();
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setScreenshot(e.target.files[0]);
@@ -68,6 +71,9 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
       if (payload.screenshot) {
         formData.append("screenshot", payload.screenshot);
       }
+      // Dapatkan token ReCaptcha
+      const captchaToken = await executeRecaptcha("submit_report");
+      formData.append("captcha_token", captchaToken);
 
       // Jangan set Content-Type manual — browser/fetch akan otomatis set multipart boundary
       const res = await fetch("/api/reports/admin", {

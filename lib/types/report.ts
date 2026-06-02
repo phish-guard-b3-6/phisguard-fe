@@ -15,7 +15,25 @@ export interface ReportDetection {
   created_at: string;
 }
 
-export interface Report {
+export type TriageStatus = "In Review" | "Submitted" | "Closed";
+export type Platform = "Website" | "WhatsApp" | "SMS" | "Email";
+export type ReportType = "url" | "phone";
+
+export interface ReportAdmin {
+  id?: string;
+  ticket_id?: string;
+  ticketId: string;
+  ticketCode: string;
+  type: ReportType;
+  reportTime: string;
+  platform: Platform;
+  riskScore: number;
+  triageStatus: TriageStatus;
+  reportedValue?: string;
+  triage_status?: "confirmed" | "false_positive" | null;
+}
+
+export interface ReportUser {
   id: string;
   user_id: string;
   message: string;
@@ -29,16 +47,16 @@ export interface Report {
   updated_at: string;
   ticket: ReportTicket;
   detection: ReportDetection;
+  triage_status?: "confirmed" | "false_positive" | null;
 }
 
 export interface ReportApiResponse {
   success: string;
-  reports: Report;
+  reports: ReportUser;
 }
 
 export type ResourceOption = "sms" | "whatsapp" | "email" | "web";
 
-export type ReportType = "url" | "phone";
 
 export interface CreateReportPayload {
   message: string;
@@ -50,29 +68,22 @@ export interface CreateReportPayload {
   screenshot?: File | null; // opsional, gambar bukti dari user
 }
 
-export interface ReportListItem {
-  id: string;
-  user_id: string;
-  message: string;
-  url: string;
-  sender_number: string;
-  resource: string;
-  description: string;
-  is_anonymous: boolean;
-  is_blacklisted: boolean;
-  created_at: string;
-  updated_at: string;
-  ticket: ReportTicket;
-  detection: ReportDetection;
-}
-
-export interface ReportListGroup {
-  reports: ReportListItem[];
-}
-
 export interface ReportListApiResponse {
   message: string;
-  reports: ReportListGroup[];
+  reports: Array<{
+    reports: ReportUser[];
+  }>;
+}
+
+export type BlacklistType = "url" | "phone";
+
+export interface BlacklistItem {
+  id: string;
+  type: BlacklistType;
+  value: string;
+  reason: string;
+  addedBy: string;
+  date: string;
 }
 
 export type RiskLevel = "Low Risk" | "Medium Risk" | "High Risk";

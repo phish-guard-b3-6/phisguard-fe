@@ -1,15 +1,28 @@
 import DetailReportStatusSection from "@/components/report-status/detail-report-status";
-import { Report, ReportApiResponse } from "@/lib/types/report";
+import { ReportUser, ReportApiResponse } from "@/lib/types/report";
 import { serverApi } from "@/lib/server-api";
+
+// Paksa halaman selalu di-render ulang di server setiap request.
+// Mencegah Next.js men-cache respons antar user yang berbeda.
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getReport(id: string): Promise<Report | null> {
+async function getReport(id: string): Promise<ReportUser | null> {
   try {
     const res = await serverApi.get<ReportApiResponse>(`/reports/${id}`);
-    return res.data.reports ?? null;
+    if (res.data.reports) {
+      const raw = res.data.reports;
+
+      const triage_status: ReportUser["triage_status"] =
+        raw.triage_status === "confirmed" || raw.triage_status === "false_positive"
+          ? raw.triage_status
+          : null;
+      return { ...raw, triage_status };
+    }
+    return null;
   } catch {
     return null;
   }

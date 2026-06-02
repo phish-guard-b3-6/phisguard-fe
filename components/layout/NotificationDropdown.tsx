@@ -1,13 +1,36 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Megaphone, Info, Ticket } from "lucide-react";
+import { Bell, Megaphone, Info, Ticket, ChevronDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
+
+// Ekstrak judul dari string broadcast:
+// Cari substring mulai dari "Laporan" hingga sebelum strip ke-2 dalam UUID
+function extractTitle(broadcastStr: string): string {
+  // Format: "Laporan dengan ID xxxxxxxx-xxxx-..."
+  // Ambil hingga sebelum strip ke-2, misal: "Laporan dengan ID 019de933-2edc"
+  const match = broadcastStr.match(/Laporan[^\n]*?ID\s+([0-9a-f]+-[0-9a-f]+)/i);
+  if (match) {
+    const idStart = broadcastStr.indexOf("Laporan");
+    const afterSecondDash = broadcastStr.indexOf(match[1]) + match[1].length;
+    return broadcastStr.slice(idStart, afterSecondDash);
+  }
+  // Fallback: baris kedua (setelah \n pertama)
+  const lines = broadcastStr.split("\n");
+  return lines.length > 1 ? lines[1] : lines[0];
+}
+
+// Trim konten hingga ~90 karakter untuk preview collapsed
+function trimContent(str: string, maxLen = 90): string {
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen).trimEnd() + "…";
+}
 
 export default function NotificationDropdown({ className }: { className?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [seenBroadcasts, setSeenBroadcasts] = useState<string[]>([]);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   // Load seen broadcasts from localStorage on mount
   useEffect(() => {
@@ -26,6 +49,8 @@ export default function NotificationDropdown({ className }: { className?: string
       if (!res.ok) throw new Error("Gagal mengambil data broadcast");
       return res.json();
     },
+    // Data selalu dianggap stale agar refetch terjadi setiap mount (termasuk setelah login)
+    staleTime: 0,
     // Fetch berjalan di background secara berkala (tiap 1 menit) untuk update red dot
     refetchInterval: 60000,
   });
@@ -36,30 +61,27 @@ export default function NotificationDropdown({ className }: { className?: string
     broadcasts = data.reports;
   }
 
-  // Batasi hanya 5 terbaru yang tampil di UI
-  broadcasts = broadcasts.slice(0, 5);
+  // Balik urutan agar broadcast terbaru (index terakhir dari backend) muncul di atas
+  broadcasts = [...broadcasts].reverse().slice(0, 5);
 
   const hasUnread = broadcasts.some((b) => !seenBroadcasts.includes(b.broadcast || ""));
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    if (open && broadcasts.length > 0) {
-      // Mark all currently fetched as seen
-      const newSeen = [...seenBroadcasts];
-      let changed = false;
-      broadcasts.forEach((b) => {
-        const str = b.broadcast || "";
-        if (!newSeen.includes(str)) {
-          newSeen.push(str);
-          changed = true;
-        }
-      });
-      if (changed) {
-        // Keep only the last 50 to avoid localStorage bloat
-        if (newSeen.length > 50) newSeen.splice(0, newSeen.length - 50);
-        setSeenBroadcasts(newSeen);
-        localStorage.setItem("seenBroadcasts", JSON.stringify(newSeen));
-      }
+    if (!open) setExpandedIndex(null); // reset expand saat dropdown ditutup
+    // Tidak auto-mark semua sebagai seen saat dropdown dibuka.
+    // Pesan ditandai sebagai "sudah dibaca" hanya ketika user klik/expand item.
+  };
+
+  // Tandai item sebagai seen hanya ketika user membuka/expand item tersebut
+  const handleToggleExpand = (i: number, broadcastStr: string) => {
+    setExpandedIndex((prev) => (prev === i ? null : i));
+    if (!seenBroadcasts.includes(broadcastStr)) {
+      const newSeen = [...seenBroadcasts, broadcastStr];
+      // Keep only the last 50 to avoid localStorage bloat
+      if (newSeen.length > 50) newSeen.splice(0, newSeen.length - 50);
+      setSeenBroadcasts(newSeen);
+      localStorage.setItem("seenBroadcasts", JSON.stringify(newSeen));
     }
   };
 
@@ -87,7 +109,7 @@ export default function NotificationDropdown({ className }: { className?: string
           </div>
         </div>
 
-        <div className="max-h-[340px] overflow-y-auto py-1 flex flex-col scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800">
+        <div className="max-h-[400px] overflow-y-auto py-1 flex flex-col scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800">
           {isLoading ? (
             <div className="p-8 flex flex-col items-center justify-center gap-3 text-sm text-gray-500">
               <div className="h-6 w-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
@@ -101,37 +123,70 @@ export default function NotificationDropdown({ className }: { className?: string
           ) : broadcasts.length > 0 ? (
             broadcasts.map((item, i) => {
               const broadcastStr = item.broadcast || "";
-              const lines = broadcastStr.split("\n");
-              const title = lines.length > 0 ? lines[0] : "Pemberitahuan Sistem";
-              const description = lines.length > 1 ? lines.slice(1).join(" ") : broadcastStr;
-
               const isUnread = !seenBroadcasts.includes(broadcastStr);
+              const isExpanded = expandedIndex === i;
+
+              const title = extractTitle(broadcastStr);
+              const previewContent = trimContent(broadcastStr);
 
               return (
                 <div
                   key={i}
-                  className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-800/50 last:border-0 flex gap-3 ${isUnread ? "bg-red-50/30 dark:bg-red-900/10" : ""}`}
+                  onClick={() => handleToggleExpand(i, broadcastStr)}
+                  className="px-4 py-3 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-800/50 last:border-0 flex gap-3 select-none hover:bg-gray-50 dark:hover:bg-gray-800/40"
                 >
-                  <div className="mt-0.5 shrink-0">
+                  {/* Icon */}
+                  <div className="mt-0.5 shrink-0 relative">
                     <div
-                      className={`h-9 w-9 rounded-full flex items-center justify-center border ${isUnread ? "bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800" : "bg-gray-50 dark:bg-gray-800 border-gray-150 dark:border-gray-700"}`}
+                      className={`h-9 w-9 rounded-full flex items-center justify-center border ${
+                        isUnread
+                          ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50"
+                          : "bg-gray-50 dark:bg-gray-800 border-gray-150 dark:border-gray-700"
+                      }`}
                     >
-                      <Ticket className={`h-4 w-4 ${isUnread ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`} />
+                      <Ticket className={`h-4 w-4 ${isUnread ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`} />
                     </div>
+                    {isUnread && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white dark:border-gray-900 shadow-sm" />
+                    )}
                   </div>
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
+
+                  {/* Content */}
+                  <div className="flex flex-col flex-1 min-w-0 gap-1">
+                    {/* Judul + chevron */}
+                    <div className="flex items-start justify-between gap-2">
                       <p
-                        className={`text-sm truncate ${isUnread ? "font-bold text-gray-900 dark:text-gray-100" : "font-medium text-gray-700 dark:text-gray-300"}`}
+                        className={`text-xs leading-snug ${
+                          isUnread
+                            ? "font-bold text-gray-900 dark:text-gray-100"
+                            : "font-semibold text-gray-700 dark:text-gray-300"
+                        }`}
                       >
                         {title}
                       </p>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 shrink-0 mt-0.5 text-gray-400 transition-transform duration-200 ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                      />
                     </div>
-                    <p
-                      className={`text-xs line-clamp-2 leading-relaxed ${isUnread ? "font-medium text-gray-800 dark:text-gray-300" : "text-gray-500 dark:text-gray-400"}`}
-                    >
-                      {description}
-                    </p>
+
+                    {/* Konten: expanded = full, collapsed = preview trimmed */}
+                    {isExpanded ? (
+                      <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-300 whitespace-pre-line">
+                        {broadcastStr}
+                      </p>
+                    ) : (
+                      <p
+                        className={`text-xs leading-relaxed ${
+                          isUnread
+                            ? "font-medium text-gray-700 dark:text-gray-300"
+                            : "text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
+                        {previewContent}
+                      </p>
+                    )}
                   </div>
                 </div>
               );

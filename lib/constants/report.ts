@@ -102,11 +102,44 @@ export const RISK_CONFIG: Record<RiskLevel, RiskConfig> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SAFE / FALSE POSITIVE CONFIG
+// Digunakan jika admin menandai report sebagai false positive (aman).
+// ─────────────────────────────────────────────────────────────────────────────
+export const SAFE_CONFIG: RiskConfig = {
+  borderColor: "border-l-blue-500",
+  badgeBorder: "border-blue-600",
+  badgeBg: "bg-white",
+  badgeShadow: "shadow-[inset_0_3px_10px_rgba(59,130,246,0.25)]",
+  textColor: "text-blue-600",
+  topBorder: "border-t-blue-500",
+  btnBg: "bg-blue-600!",
+  btnHoverBg: "hover:bg-blue-700!",
+  btnShadow: "shadow-blue-100",
+  bgOpacity: 0.1,
+  label: "Safe",
+  alertTitle: "Security Cleared ✅",
+  alertBody: "Our security team has reviewed your report and confirmed it is a False Alarm (Safe).",
+  recommendations: [
+    "You can safely interact with the provided link or sender.",
+    "Our system will learn from this to improve future accuracy.",
+    "Thank you for being vigilant!",
+  ],
+  icon: "/icon/warning_green.svg", // Nanti bisa ganti pakai icon yang lebih pas kalau ada
+  bgIcon: "/icon/warning_green_bg.svg",
+  border: "border-blue-300",
+  bg: "bg-blue-50",
+  text: "text-blue-600",
+  dateBg: "bg-blue-400",
+  dateText: "text-white",
+  shadow: "shadow-[inset_0_3px_10px_rgba(59,130,246,0.25)]",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATUS CONFIG
 // Konfigurasi tampilan badge status tiket.
 // ─────────────────────────────────────────────────────────────────────────────
 export const STATUS_CONFIG: Record<ReportHandlingStatus, { label: string; bg: string; text: string }> = {
-  Submitted: { label: "Submitted", bg: "bg-gray-200", text: "text-gray-600" },
+  Submitted: { label: "Submitted", bg: "bg-blue-100", text: "text-blue-600" },
   "In Review": { label: "In Review", bg: "bg-green-400", text: "text-white" },
   Closed: { label: "Closed", bg: "bg-gray-200", text: "text-gray-600" },
 };
@@ -145,8 +178,8 @@ export const CHANNEL_ICON: Record<string, React.ReactNode> = {
 
 /** Memetakan label API (low_risk, medium_risk, high_risk) ke RiskLevel display. */
 export function mapLabel(label: string): RiskLevel {
-  if (label === "high_risk") return "High Risk";
-  if (label === "medium_risk") return "Medium Risk";
+  if (label === "high_risk" || label === "high") return "High Risk";
+  if (label === "medium_risk" || label === "medium") return "Medium Risk";
   return "Low Risk";
 }
 
