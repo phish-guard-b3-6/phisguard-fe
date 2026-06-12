@@ -24,9 +24,16 @@ export async function PATCH(
     );
 
     const text = await backendRes.text();
-    const data = text ? JSON.parse(text) : {};
+    let data: Record<string, any> = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      console.error(`[PROXY PATCH /api/reports/blacklist/${id}] Failed to parse JSON:`, text);
+    }
 
     if (!backendRes.ok) {
+      console.error(`[PROXY PATCH /api/reports/blacklist/${id}] Backend ${backendRes.status}:`, text);
+      console.error(`[PROXY PATCH /api/reports/blacklist/${id}] Request body:`, JSON.stringify(body));
       return NextResponse.json(
         { message: data?.message ?? "Gagal mengirim data blacklist." },
         { status: backendRes.status }
@@ -34,7 +41,8 @@ export async function PATCH(
     }
 
     return NextResponse.json(data, { status: backendRes.status });
-  } catch {
+  } catch (error) {
+    console.error(`[PROXY PATCH /api/reports/blacklist/${id}] Exception:`, error);
     return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
   }
 }

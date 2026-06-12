@@ -67,7 +67,14 @@ export default function TicketDetailModal({ isOpen, onClose, report }: TicketDet
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
+        console.error("[TicketDetailModal] PATCH /api/reports/blacklist error:", {
+          status: res.status,
+          report_id: report.id,
+          ticket_code: report.ticketCode,
+          body,
+          backendMessage: err?.message,
+        });
         throw new Error(err?.message ?? "Gagal mengirim data blacklist");
       }
 
@@ -138,17 +145,45 @@ export default function TicketDetailModal({ isOpen, onClose, report }: TicketDet
 
         <div className="px-5 py-4 flex flex-col gap-4 flex-1 overflow-y-auto">
           {/* Risk Score Card */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1 font-light">Risk Score</p>
-              <div className="flex items-center gap-2">
-                <span className={`${riskColor}`}>{riskScore}/100</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-light border ${riskBadge}`}>{riskLabel}</span>
+          <div className="shrink-0 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 relative overflow-hidden">
+            {/* Background Decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-br from-gray-100 to-transparent dark:from-gray-700/50 rounded-bl-full z-0 opacity-50" />
+            
+            <div className="flex flex-col gap-4 relative z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1">Risk Score</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-4xl font-black tracking-tighter ${riskColor}`}>
+                      {riskScore}
+                    </span>
+                    <span className="text-lg text-gray-400 dark:text-gray-500 font-bold">/100</span>
+                    <span className={`ml-2 px-2.5 py-0.5 rounded-md text-xs font-bold border shadow-sm ${riskBadge}`}>
+                      {riskLabel}
+                    </span>
+                  </div>
+                </div>
+                <div className="hidden sm:flex items-center justify-center w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 shadow-inner">
+                  {isFalsePositive ? (
+                    <ShieldCheck className="w-6 h-6 text-blue-500" strokeWidth={2} />
+                  ) : riskScore >= 70 ? (
+                    <ShieldAlert className="w-6 h-6 text-red-500" strokeWidth={2} />
+                  ) : (
+                    <ShieldAlert className="w-6 h-6 text-orange-500" strokeWidth={2} />
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="text-right flex flex-col items-start">
-              <p className="text-xs dark:text-white mb-1 font-light">Reported Data</p>
-              <p className="text-sm text-gray-800 dark:text-gray-100 break-all max-w-[200px]">{report.reportedValue ?? "-"}</p>
+
+              <div className="h-px w-full bg-gray-100 dark:bg-gray-700/60" />
+
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider mb-1.5">Reported Data</p>
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-100 dark:border-gray-700/50">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 break-all leading-tight">
+                    {report.reportedValue ?? "-"}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -277,7 +312,7 @@ export default function TicketDetailModal({ isOpen, onClose, report }: TicketDet
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 flex items-center justify-end gap-2.5 border-t border-gray-200 dark:border-gray-700">
+        <div className="px-5 py-3.5 flex items-center justify-end gap-2.5 border-t border-red-800 dark:border-gray-700">
           <Button onClick={onClose} size="sm" className="px-6 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold shadow-xs">
             Cancel
           </Button>

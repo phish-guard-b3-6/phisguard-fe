@@ -141,25 +141,10 @@ export default function LatestReportsTable({
     }
   };
 
-  const handleDetailClick = async (report: ReportAdmin) => {
-    if (report.ticket_id && report.id) {
-      // Jalankan GET detail dan PATCH status secara paralel — keduanya independen
-      const [detailResult] = await Promise.allSettled([
-        fetch(`/api/tickets?id=${report.ticket_id}&report_id=${report.id}`).then((res) => {
-          if (!res.ok) throw new Error("Gagal mengambil data detail tiket");
-          return res.json();
-        }),
-        // PATCH hanya jika status belum In Review
-        report.triageStatus !== "In Review" && report.ticket_id
-          ? patchInReview(report.ticket_id)
-          : Promise.resolve(),
-      ]);
-
-      if (detailResult.status === "fulfilled") {
-        console.log("Detail data:", detailResult.value);
-      } else {
-        console.error("Error fetching ticket detail:", detailResult.reason);
-      }
+  const handleDetailClick = (report: ReportAdmin) => {
+    // PATCH status ke in_review jika belum In Review
+    if (report.triageStatus !== "In Review" && report.ticket_id) {
+      patchInReview(report.ticket_id);
     }
 
     if (onDetailClick) {

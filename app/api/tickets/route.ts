@@ -18,17 +18,24 @@ export async function GET(req: NextRequest) {
     });
 
     const text = await backendRes.text();
-    const data = text ? JSON.parse(text) : {};
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (parseError) {
+      console.error("[PROXY /api/tickets] Failed to parse JSON:", text);
+    }
 
     if (!backendRes.ok) {
+      console.error(`[PROXY /api/tickets] Backend returned ${backendRes.status}:`, text);
       return NextResponse.json(
-        { message: data?.message ?? "Gagal mengambil detail tiket." },
+        { message: (data as any)?.message ?? "Gagal mengambil detail tiket." },
         { status: backendRes.status }
       );
     }
 
     return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
+    console.error(`[PROXY /api/tickets] Internal Server Error:`, error);
     return NextResponse.json(
       { message: "Internal Server Error" },
       { status: 500 }

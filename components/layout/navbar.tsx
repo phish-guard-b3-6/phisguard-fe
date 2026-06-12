@@ -100,7 +100,9 @@ export default function Navbar() {
       {/* Search and bell Icon when < 768 / mobile  */}
       <div className={`${isSearchOpen && isMobile ? "hidden" : "flex"} md:hidden gap-4`}>
         <Search className="h-5 w-5 cursor-pointer" onClick={() => setIsSearchOpen(true)} />
-        <NotificationDropdown className="h-5 w-5" />
+        {role !== "admin" && (
+          <NotificationDropdown className="h-5 w-5" />
+        )}
       </div>
 
       {/* Search bar */}
@@ -188,8 +190,12 @@ export default function Navbar() {
           </div>
         )}
 
-        <Separator orientation="vertical" className="hidden md:flex bg-gray-400 " />
-        <NotificationDropdown className="hidden md:block" />
+        {role !== "admin" && (
+          <>
+            <Separator orientation="vertical" className="hidden md:flex bg-gray-400 " />
+            <NotificationDropdown className="hidden md:block" />
+          </>
+        )}
         {isSearchOpen && isMobile && (
           <X className="h-6 w-6 text-gray-600 cursor-pointer" onClick={handleClearSearch} />
         )}
