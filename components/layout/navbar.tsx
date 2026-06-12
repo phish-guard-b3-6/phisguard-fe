@@ -99,7 +99,9 @@ export default function Navbar() {
 
       {/* Search and bell Icon when < 768 / mobile  */}
       <div className={`${isSearchOpen && isMobile ? "hidden" : "flex"} md:hidden gap-4`}>
-        <Search className="h-5 w-5 cursor-pointer" onClick={() => setIsSearchOpen(true)} />
+        {role !== "admin" && (
+          <Search className="h-5 w-5 cursor-pointer" onClick={() => setIsSearchOpen(true)} />
+        )}
         {role !== "admin" && (
           <NotificationDropdown className="h-5 w-5" />
         )}
@@ -107,8 +109,10 @@ export default function Navbar() {
 
       {/* Search bar */}
       <div className={`${isSearchOpen && isMobile ? "flex flex-1" : "hidden"} md:flex relative w-full items-center gap-4`}>
-        {/* Icon search berubah jadi spinner saat loading */}
-        {isSearching ? (
+        {role !== "admin" && (
+          <>
+            {/* Icon search berubah jadi spinner saat loading */}
+            {isSearching ? (
           <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
         ) : (
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 md:text-white -scale-x-100" />
@@ -188,6 +192,8 @@ export default function Navbar() {
               );
             })() : null}
           </div>
+        )}
+          </>
         )}
 
         {role !== "admin" && (
