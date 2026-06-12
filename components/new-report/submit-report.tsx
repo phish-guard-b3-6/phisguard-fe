@@ -3,14 +3,28 @@ import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-
 import Link from "next/link";
+import { ReportUser } from "@/lib/types/report";
 
 interface SubmitReportProps {
+  report: ReportUser;
   setIsSubmitted: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export default function SubmitReport({ setIsSubmitted }: SubmitReportProps) {
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const RISK_CONFIG: Record<string, { label: string; color: string }> = {
+  low_risk: { label: "Low Risk", color: "#22c55e" },
+  medium_risk: { label: "Medium Risk", color: "#f59e0b" },
+  high_risk: { label: "High Risk", color: "#ef4444" },
+};
+
+export default function SubmitReport({ report, setIsSubmitted }: SubmitReportProps) {
+  const ticketCode = report?.ticket?.code ?? "-";
+  const score = report?.detection?.score ?? 0;
+  const labelKey = report?.detection?.label ?? "low_risk";
+  const risk = RISK_CONFIG[labelKey] ?? RISK_CONFIG["low_risk"];
+
   return (
     <div className="flex flex-col items-center justify-center w-full py-4">
       <Card className="w-full border-none shadow-xl rounded-xl md:rounded-2xl p-6 lg:p-8 bg-white">
@@ -30,7 +44,7 @@ export default function SubmitReport({ setIsSubmitted }: SubmitReportProps) {
           <div className="w-full md:w-3/4 lg:w-1/2 bg-[#f8f9fa] border border-gray-100 rounded-xl md:rounded-2xl px-3 md:px-6 py-3 md:py-6 space-y-2">
             <div className="space-y-1 md:space-y-3">
               <p className="text-[10px] md:text-sm tracking-wide uppercase font-heading">Ticket ID</p>
-              <h3 className="text-sm md:text-2xl font-bold text-[#1a1a1a] tracking-tight">TKT-CIMB-6664</h3>
+              <h3 className="text-sm md:text-2xl font-bold text-[#1a1a1a] tracking-tight">{ticketCode}</h3>
               <p className="text-[8px] md:text-xs font-light">Save this ID to check your report status later using the search bar.</p>
             </div>
 
@@ -40,8 +54,12 @@ export default function SubmitReport({ setIsSubmitted }: SubmitReportProps) {
               <p className="text-[10px] md:text-sm tracking-wide uppercase">Initial Risk Score</p>
 
               <div className="inline-flex flex-col items-center justify-center bg-white border border-gray-100 rounded-3xl px-4 md:px-8 py-1 md:py-3 shadow-sm">
-                <p className="text-[7px] md:text-[10px] text-[#22c55e] uppercase tracking-wider">Low Risk</p>
-                <p className="text-sm md:text-3xl text-[#22c55e] font-semibold">35/100</p>
+                <p className="text-[7px] md:text-[10px] uppercase tracking-wider" style={{ color: risk.color }}>
+                  {risk.label}
+                </p>
+                <p className="text-sm md:text-3xl font-semibold" style={{ color: risk.color }}>
+                  {score}/100
+                </p>
               </div>
 
               <p className="text-[8px] md:text-xs font-light mt-2">Score &gt; 70 indicates high probability of phishing.</p>

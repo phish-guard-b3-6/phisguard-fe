@@ -15,14 +15,14 @@ import { Info, Link, MessageSquareMore, Phone, CheckSquare, Image as ImageIcon }
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { CreateReportPayload, ResourceOption, ReportType } from "@/lib/types/report";
+import { CreateReportPayload, ResourceOption, ReportType, ReportUser } from "@/lib/types/report";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useReCaptcha } from "next-recaptcha-v3";
 
 interface CreateNewReportProps {
-  onSubmitSuccess: (reportId: string) => void;
+  onSubmitSuccess: (report: ReportUser) => void;
 }
 
 export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProps) {
@@ -93,7 +93,7 @@ export default function CreateNewReport({ onSubmitSuccess }: CreateNewReportProp
       toast.success("Laporan berhasil dikirim!", {
         description: "Tim kami akan segera menindaklanjuti laporan Anda.",
       });
-      onSubmitSuccess(data?.reports?.id ?? "");
+      onSubmitSuccess(data?.reports);
     },
     onError: (err: unknown) => {
       const msg = (err as Error)?.message ?? "Terjadi kesalahan, coba lagi nanti.";
