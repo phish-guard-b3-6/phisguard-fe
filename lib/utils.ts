@@ -18,7 +18,7 @@ export function formatDate(dateStr: string): string {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      timeZone: "Asia/Jakarta", // WIB (UTC+7) — eksplisit agar tidak bergantung timezone server
+      timeZone: "Asia/Singapore", // UTC+8 (SGT/MYT) — backend CIMB menggunakan timezone Malaysia/Singapura
     }).format(new Date(dateStr));
   } catch {
     return dateStr;

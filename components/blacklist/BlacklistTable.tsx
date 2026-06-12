@@ -111,7 +111,7 @@ export default function BlacklistTable() {
       day: "numeric",
       month: "short",
       year: "numeric",
-      timeZone: "Asia/Jakarta", // WIB (UTC+7) — eksplisit agar tidak bergantung timezone server
+      timeZone: "Asia/Singapore", // UTC+8 (SGT/MYT) — backend CIMB menggunakan timezone Malaysia/Singapura
     }),
   }));
 
