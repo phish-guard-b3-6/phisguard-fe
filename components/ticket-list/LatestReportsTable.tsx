@@ -115,7 +115,7 @@ export default function LatestReportsTable({
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
-            timeZone: "Asia/Jakarta", // WIB (UTC+7) — eksplisit agar tidak bergantung timezone server
+            timeZone: "Asia/Singapore", // UTC+8 (SGT/MYT) — backend CIMB menggunakan timezone Malaysia/Singapura
           }),
           platform: r.resource ? (r.resource === "sms" ? "SMS" : r.resource.charAt(0).toUpperCase() + r.resource.slice(1)) : "Web",
           riskScore: r.detection?.score || 0,
