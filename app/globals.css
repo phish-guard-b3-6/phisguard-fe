@@ -136,29 +136,18 @@ svg, svg * {
   outline: none !important;
 }
 
-/* Custom Scrollbar Styles for a modern, clean look */
+/* Hide Scrollbar Globally for a cleaner look */
 @layer utilities {
   /* Webkit browsers (Chrome, Safari, Edge, Opera) */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(220, 38, 38, 0.15); /* Light red tint to match CIMB theme */
-    border-radius: 9999px;
-    transition: background 0.2s ease;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(220, 38, 38, 0.35); /* Darker red tint on hover */
+    display: none;
+    width: 0px;
+    height: 0px;
   }
 
   /* Firefox */
   * {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(220, 38, 38, 0.15) transparent;
+    scrollbar-width: none;
   }
 }
 
