@@ -1,55 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/** Route publik yang hanya bisa diakses TANPA login. Jika sudah login, redirect ke halaman utama. */
-const AUTH_ROUTES = ["/signin", "/signup", "/otp", "/reset-password"];
+// ─── Route categories ────────────────────────────────────────────────────────
+/** Route auth — redirect ke halaman utama jika sudah login */
+const AUTH_ROUTES = ["/signin", "/signup", "/otp", "/reset-password", "/forgot-password"];
 
-/** Route publik yang bisa diakses oleh siapa saja (login maupun tidak). */
+/** Route publik — bisa diakses siapa saja termasuk guest */
 const PUBLIC_ROUTES = ["/new-report"];
 
-/** Route yang WAJIB login (user atau admin). */
-const PROTECTED_ROUTES = ["/report-status", "/profile", "/microlearning"];
+/** Route hanya untuk admin */
+const ADMIN_ONLY_ROUTES = ["/dashboard", "/blacklist", "/ticket-list"];
 
-/** Route yang HANYA bisa diakses oleh admin. */
-const ADMIN_ROUTES = ["/dashboard", "/blacklist", "/ticket-list"];
+/** Route hanya untuk user biasa (bukan admin) */
+const USER_ONLY_ROUTES = ["/new-report", "/microlearning", "/report-status"];
 
-/** Route internal Next.js (API, _next, assets) yang tidak perlu dicek. */
-const BYPASS_PREFIXES = ["/api", "/_next", "/favicon.ico", "/public"];
+/** Route yang butuh login, bisa diakses admin maupun user */
+const SHARED_PROTECTED_ROUTES = ["/profile"];
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // 1. Lewati request untuk aset statis dan API internal
-  if (BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return NextResponse.next();
+// ─── Helper: decode JWT payload tanpa verifikasi signature ───────────────────
+// Proxy berjalan di edge/server sebelum render, tidak bisa memanggil backend.
+// Kita hanya butuh claim `role` untuk routing — verifikasi signature tetap
+// dilakukan backend saat request API sesungguhnya dijalankan.
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(base64);
+    return JSON.parse(json);
+  } catch {
+    return null;
   }
+}
 
-  const token = req.cookies.get("auth_token")?.value;
+export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Baca cookie auth_token yang diset oleh /api/login
+  const token = request.cookies.get("auth_token")?.value;
+  const payload = token ? decodeJwtPayload(token) : null;
+
+  // Token dianggap valid jika payload ada dan belum expired
+  const now = Math.floor(Date.now() / 1000);
+  const isAuthenticated = !!payload && (typeof payload.exp !== "number" || payload.exp > now);
+  const role = isAuthenticated ? (payload?.role as string | undefined) : undefined;
+
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r));
-  const isProtectedRoute = PROTECTED_ROUTES.some((r) => pathname.startsWith(r));
-  const isAdminRoute = ADMIN_ROUTES.some((r) => pathname.startsWith(r));
-
-  // 2. Jika user SUDAH LOGIN dan mencoba akses halaman auth (signin/signup)
-  //    → redirect ke halaman utama agar tidak bisa balik ke login
   const isPublicRoute = PUBLIC_ROUTES.some((r) => pathname.startsWith(r));
+  const isAdminRoute = ADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r));
+  const isUserRoute = USER_ONLY_ROUTES.some((r) => pathname.startsWith(r));
 
-  // 2. Jika user SUDAH LOGIN dan mencoba akses halaman auth (signin/signup)
-  //    → redirect ke halaman utama
-  if (token && isAuthRoute) {
-    return NextResponse.redirect(new URL("/new-report", req.url));
+  // 1. User sudah login → jangan biarkan akses halaman auth (signin/signup dll)
+  //    Admin → /dashboard, User biasa → /new-report
+  if (isAuthenticated && isAuthRoute) {
+    const destination = role === "admin" ? "/dashboard" : "/new-report";
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
-  // 3. Izinkan semua orang mengakses public routes tanpa perlu login
-  if (isPublicRoute) {
-    return NextResponse.next();
+  // 2. Route admin — belum login → ke signin
+  if (isAdminRoute && !isAuthenticated) {
+    const signinUrl = new URL("/signin", request.url);
+    signinUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(signinUrl);
   }
 
-  // 4. Jika user BELUM LOGIN dan mencoba akses halaman protected atau admin
-  //    → redirect ke signin. Cookie akan dihapus jika expired oleh browser otomatis.
-  if (!token && (isProtectedRoute || isAdminRoute)) {
-    const signinUrl = new URL("/signin", req.url);
-    // Simpan halaman tujuan awal agar bisa diarahkan balik setelah login
+  // 3. Route admin — sudah login tapi bukan admin → ke /new-report
+  if (isAdminRoute && role !== "admin") {
+    return NextResponse.redirect(new URL("/new-report", request.url));
+  }
+
+  // 4. Route user-only — diakses oleh admin → ke /dashboard
+  if (isUserRoute && role === "admin") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // 5. Halaman yang butuh login (bukan public) — belum login → ke signin
+  if (!isPublicRoute && !isAdminRoute && !isAuthRoute && !isAuthenticated) {
+    const signinUrl = new URL("/signin", request.url);
     signinUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(signinUrl);
   }
@@ -58,5 +84,14 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    /*
+     * Jalankan proxy di semua halaman KECUALI:
+     * - /api/*         (route handler Next.js)
+     * - /_next/static  (file statis)
+     * - /_next/image   (optimasi gambar)
+     * - file publik    (svg, png, ico, dll)
+     */
+    "/((?!api|_next/static|_next/image|favicon\\.ico|icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
