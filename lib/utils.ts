@@ -6,8 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Memformat string tanggal ISO ke format tampilan "dd Mon yyyy, hh:mm".
- * Digunakan di seluruh halaman report untuk konsistensi tampilan tanggal.
+ * Memformat string tanggal ISO ke format tampilan "dd Mon yyyy, hh:mm" dalam WIB (UTC+7).
+ * Timezone eksplisit diperlukan agar output konsisten di semua environment
+ * (localhost & Vercel yang default-nya berjalan di UTC).
  */
 export function formatDate(dateStr: string): string {
   try {
@@ -17,6 +18,7 @@ export function formatDate(dateStr: string): string {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Asia/Jakarta", // WIB (UTC+7) — eksplisit agar tidak bergantung timezone server
     }).format(new Date(dateStr));
   } catch {
     return dateStr;
