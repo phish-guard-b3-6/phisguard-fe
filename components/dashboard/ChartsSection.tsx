@@ -45,17 +45,26 @@ export default function ChartsSection({ dailyStats = [], phishingChannels = {} }
     Email: "#EF4444", // Red
     Whatsapp: "#F59E0B", // Yellow/Orange
     Sms: "#4F46E5", // Indigo/Blue
-    Website: "#4F46E5", // Indigo/Blue
+    SMS: "#4F46E5", // Indigo/Blue
+    Web: "#10B981", // Green
+    Website: "#10B981", // Green
+  };
+
+  // Mapping label agar tampil konsisten di chart
+  const labelMap: Record<string, string> = {
+    Sms: "SMS",
+    Web: "Website",
   };
 
   const methodsData = Object.entries(phishingChannels)
     .map(([key, value]) => {
       // Capitalize first letter
       const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+      const displayName = labelMap[formattedKey] ?? formattedKey;
       return {
-        name: formattedKey === "Sms" ? "SMS" : formattedKey,
+        name: displayName,
         count: value,
-        fill: channelColors[formattedKey] || "#6B7280",
+        fill: channelColors[formattedKey] || channelColors[displayName] || "#6B7280",
       };
     })
     .sort((a, b) => b.count - a.count)
