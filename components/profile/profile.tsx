@@ -38,7 +38,6 @@ export default function ProfileSection() {
   const fullName = `${user.firstname} ${user.lastname}`.trim();
   // Generate avatar initials fallback
   const initials = `${user.firstname.charAt(0)}${user.lastname.charAt(0)}`.toUpperCase();
-  const roleLabel = user.role === "admin" ? "CIMB Niaga Admin" : "CIMB Niaga Customer";
 
   return (
     <div className="w-full md:w-4/5 lg:w-3/4 my-4 md:my-6 md:m-auto px-4 md:px-6 space-y-4 md:space-y-6 pb-6">
@@ -90,10 +89,8 @@ export default function ProfileSection() {
             </h2>
             
             <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-3 mt-1.5">
-              <p className="text-xs md:text-sm font-bold text-[#E22E2E] dark:text-red-400 tracking-wide uppercase">{roleLabel}</p>
               {user.is_verified && (
                 <>
-                  <span className="hidden md:inline-block w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
                   <span className="inline-flex items-center gap-1.5 text-[10px] md:text-xs text-green-700 dark:text-green-400 font-bold bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full border border-green-200/50 dark:border-green-800/50 shadow-sm">
                     <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
                     Verified
@@ -143,17 +140,6 @@ export default function ProfileSection() {
               <p className="text-base md:text-lg font-semibold text-gray-900 dark:text-white pl-1 break-all">{user.email}</p>
             </div>
 
-            {/* Role */}
-            <div className="bg-gray-50/50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-800 rounded-xl md:rounded-2xl p-4 hover:bg-white dark:hover:bg-gray-900 hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-none hover:-translate-y-1 transition-all duration-300 group/field relative overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E22E2E] scale-y-0 group-hover/field:scale-y-100 origin-top transition-transform duration-300"></div>
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="p-1.5 bg-white dark:bg-gray-950 rounded-md md:rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 group-hover/field:border-red-200 dark:group-hover/field:border-red-900/50 transition-colors">
-                  <Shield className="w-3.5 h-3.5 text-gray-400 group-hover/field:text-[#E22E2E] transition-colors" />
-                </div>
-                <p className="text-[10px] md:text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">System Role</p>
-              </div>
-              <p className="text-base md:text-lg font-semibold text-gray-900 dark:text-white pl-1 capitalize">{user.role}</p>
-            </div>
           </div>
 
           {/* Action Buttons (Mobile + Extra Actions) */}
