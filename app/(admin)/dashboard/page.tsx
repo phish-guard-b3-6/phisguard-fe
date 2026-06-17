@@ -51,20 +51,6 @@ function mapReports(rawReports: any[]): ReportAdmin[] {
 export default async function DashboardPage() {
   const dashboardData = await getDashboardData();
 
-  // Fix: Some web reports have an empty resource string and are not counted in the backend's phishing_channels
-  if (dashboardData?.phishing_channels && dashboardData?.total_reports) {
-    const channels = dashboardData.phishing_channels;
-    const email = channels.email || 0;
-    const whatsapp = channels.whatsapp || 0;
-    const sms = channels.sms || 0;
-    const website = channels.website || 0;
-    
-    const accounted = email + whatsapp + sms + website;
-    if (dashboardData.total_reports > accounted) {
-      channels.website = website + (dashboardData.total_reports - accounted);
-    }
-  }
-
   const stats = {
     totalReports: {
       value: dashboardData?.total_reports,
